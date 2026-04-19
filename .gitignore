@@ -8,13 +8,10 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
-dist-ssr
+.next/
+out/
+next-env.d.ts
 *.local
-
-# Generated post JSONs (built at deploy time)
-public/posts/
-public/posts.json
 
 # Editor directories and files
 .vscode/*

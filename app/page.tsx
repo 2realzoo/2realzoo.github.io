@@ -1,22 +1,8 @@
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import Link from 'next/link'
+import { getAllPostsMeta } from '@/lib/posts'
 
-interface PostMeta {
-  slug: string
-  title: string
-  date: string
-  tags: string[]
-  summary: string
-}
-
-export default function Home() {
-  const [posts, setPosts] = useState<PostMeta[]>([])
-
-  useEffect(() => {
-    fetch('/posts.json')
-      .then(r => r.json())
-      .then(setPosts)
-  }, [])
+export default function HomePage() {
+  const posts = getAllPostsMeta()
 
   return (
     <main className="container">
@@ -28,7 +14,7 @@ export default function Home() {
       <section className="post-list">
         {posts.map(post => (
           <article key={post.slug} className="post-card">
-            <Link to={`/post/${post.slug}`}>
+            <Link href={`/post/${post.slug}`}>
               <h2>{post.title}</h2>
             </Link>
             <div className="post-meta">
