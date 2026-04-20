@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm'
 import { getAllSlugs, getPostBySlug } from '@/lib/posts'
 import type { Metadata } from 'next'
 import type React from 'react'
+import { notFound } from 'next/navigation'
 import PostClient from './PostClient'
 import './post.css'
 
@@ -114,12 +115,19 @@ interface Props {
   params: Promise<{ slug: string }>
 }
 
+// When posts/ is empty, return a dummy slug so Next.js output:export doesn't error.
+// The page component calls notFound() for any slug not in the real post list.
+const FALLBACK_SLUG = '__none__'
+
 export async function generateStaticParams() {
-  return getAllSlugs().map(slug => ({ slug }))
+  const slugs = getAllSlugs()
+  if (slugs.length === 0) return [{ slug: FALLBACK_SLUG }]
+  return slugs.map(slug => ({ slug }))
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
+  if (!getAllSlugs().includes(slug)) return {}
   const post = getPostBySlug(slug)
   return {
     title: `${post.title} — realzoojin`,
@@ -129,6 +137,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function PostPage({ params }: Props) {
   const { slug } = await params
+  if (!getAllSlugs().includes(slug)) notFound()
   const post = getPostBySlug(slug)
 
   const headings = extractH2s(post.content)
