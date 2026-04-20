@@ -10,10 +10,16 @@ export interface PostMeta {
   date: string
   tags: string[]
   summary: string
+  category?: string
 }
 
 export interface PostData extends PostMeta {
   content: string
+  category?: string
+  issue?: string
+  deck?: string
+  readingTime?: number
+  stack?: Record<string, string>
 }
 
 export function getAllPostsMeta(): PostMeta[] {
@@ -30,6 +36,7 @@ export function getAllPostsMeta(): PostMeta[] {
       date: data.date ? new Date(data.date).toISOString().slice(0, 10) : '',
       tags: data.tags ?? [],
       summary: data.summary ?? '',
+      category: data.category ?? undefined,
     }
   })
 
@@ -47,6 +54,11 @@ export function getPostBySlug(slug: string): PostData {
     tags: data.tags ?? [],
     summary: data.summary ?? '',
     content,
+    category: data.category ?? undefined,
+    issue: data.issue ?? undefined,
+    deck: data.deck ?? undefined,
+    readingTime: data.readingTime ?? undefined,
+    stack: data.stack ?? undefined,
   }
 }
 
@@ -55,4 +67,9 @@ export function getAllSlugs(): string[] {
     .readdirSync(POSTS_DIR)
     .filter(f => f.endsWith('.md'))
     .map(f => f.replace(/\.md$/, ''))
+}
+
+export function extractWikilinks(content: string): string[] {
+  const matches = [...content.matchAll(/\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g)]
+  return matches.map(m => m[1].trim())
 }
