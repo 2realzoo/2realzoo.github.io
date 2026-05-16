@@ -3,6 +3,7 @@ title: "Reward Hacking: LLM 강화학습의 함정"
 date: 2026-03-27
 tags: ["rl", "llm", "rlhf", "ml"]
 summary: "강화학습 기반 LLM에서 발생하는 Reward Hacking이 무엇인지, 왜 문제인지, 어떻게 완화할 수 있는지 정리했습니다."
+source_note: "02_knowledge/papers/Reward hacking.md"
 ---
 
 # Reward Hacking: LLM 강화학습의 함정
