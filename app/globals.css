@@ -1,15 +1,41 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg: #0f0f0f;
-  --surface: #1a1a1a;
-  --border: #2a2a2a;
-  --text: #e8e8e8;
-  --text-muted: #888;
-  --accent: #7c6af7;
-  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --bg: #ffffff;
+  --surface: #f9fafb;
+  --border: #e5e7eb;
+  --text: #374151;
+  --text-h: #111827;
+  --text-muted: #6b7280;
+  --accent: #7c3aed;
+  --accent-bg: rgba(124, 58, 237, 0.08);
+  --accent-border: rgba(192, 132, 252, 0.3);
+  --code-bg: #f3f4f6;
+  --social-bg: rgba(0, 0, 0, 0.05);
+  --shadow: rgba(0, 0, 0, 0.08) 0 4px 12px, rgba(0, 0, 0, 0.04) 0 1px 3px;
+  --heading: 'Inter', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', 'Fira Code', monospace;
   --font-sans: 'Inter', system-ui, sans-serif;
 }
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16171d;
+    --surface: #1f2028;
+    --border: #2e303a;
+    --text: #9ca3af;
+    --text-h: #f3f4f6;
+    --text-muted: #6b7280;
+    --accent: #c084fc;
+    --accent-bg: rgba(192, 132, 252, 0.12);
+    --accent-border: rgba(192, 132, 252, 0.4);
+    --code-bg: #1f2028;
+    --social-bg: rgba(47, 48, 58, 0.6);
+    --shadow: rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+  }
+}
+
+html { background: var(--bg); }
 
 body {
   background: var(--bg);
@@ -20,10 +46,33 @@ body {
   margin: 0;
 }
 
+h1, h2, h3, h4 {
+  font-family: var(--heading);
+  color: var(--text-h);
+  font-weight: 600;
+}
+
+p { margin: 0; }
+
+code {
+  font-family: var(--mono);
+  display: inline-flex;
+  border-radius: 4px;
+  color: var(--text-h);
+  font-size: 0.875em;
+  line-height: 1.35;
+  padding: 2px 6px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+}
+
+/* ── Blog container ── */
 .container {
   max-width: 720px;
+  width: 100%;
   margin: 0 auto;
   padding: 2rem 1.5rem 6rem;
+  text-align: left;
 }
 
 /* Header */
@@ -35,12 +84,12 @@ body {
 .site-header h1 {
   font-size: 2rem;
   font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--text);
+  letter-spacing: -0.03em;
+  color: var(--text-h);
 }
 .site-header p {
   color: var(--text-muted);
-  margin-top: 0.3rem;
+  margin-top: 0.35rem;
   font-size: 0.95rem;
 }
 
@@ -54,42 +103,51 @@ body {
 .post-card:last-child { border-bottom: none; }
 
 .post-card h2 {
-  font-size: 1.2rem;
+  font-size: 1.15rem;
   font-weight: 600;
   letter-spacing: -0.01em;
+  color: var(--text-h);
 }
-.post-card a { color: var(--text); text-decoration: none; }
+.post-card a { color: inherit; text-decoration: none; }
 .post-card a:hover h2 { color: var(--accent); }
 
 .post-meta {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
   margin-top: 0.4rem;
-  font-size: 0.85rem;
+  font-size: 0.83rem;
   color: var(--text-muted);
 }
+
 .tag {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
   border-radius: 4px;
-  padding: 0 0.4rem;
-  font-size: 0.78rem;
+  padding: 1px 6px;
+  font-size: 0.76rem;
   color: var(--accent);
+  font-family: var(--mono);
 }
+
 .summary {
-  margin-top: 0.6rem;
+  margin-top: 0.55rem;
   color: var(--text-muted);
-  font-size: 0.92rem;
+  font-size: 0.91rem;
+  line-height: 1.6;
 }
 
 /* Post content */
 .back-link {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   color: var(--text-muted);
   text-decoration: none;
-  font-size: 0.9rem;
+  font-size: 0.875rem;
   margin-bottom: 2.5rem;
+  transition: color 0.15s;
 }
 .back-link:hover { color: var(--accent); }
 
@@ -99,37 +157,34 @@ body {
   margin-bottom: 2rem;
 }
 .post-content article header h1 {
-  font-size: 1.8rem;
+  font-size: 1.75rem;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
   line-height: 1.3;
+  color: var(--text-h);
 }
 
 /* Markdown content */
-.post-content h1, .post-content h2, .post-content h3 {
-  margin: 2rem 0 0.8rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+.post-content h2 {
+  font-size: 1.25rem;
+  margin: 2.2rem 0 0.75rem;
+  color: var(--text-h);
 }
-.post-content h2 { font-size: 1.3rem; }
-.post-content h3 { font-size: 1.1rem; }
-.post-content p { margin: 1rem 0; color: #d0d0d0; }
-.post-content a { color: var(--accent); }
-.post-content ul, .post-content ol { margin: 1rem 0 1rem 1.5rem; }
-.post-content li { margin: 0.3rem 0; color: #d0d0d0; }
-.post-content code {
-  font-family: var(--font-mono);
-  font-size: 0.88em;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.1em 0.4em;
+.post-content h3 {
+  font-size: 1.05rem;
+  margin: 1.8rem 0 0.6rem;
+  color: var(--text-h);
 }
+.post-content p { margin: 0.9rem 0; color: var(--text); line-height: 1.75; }
+.post-content a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.post-content ul, .post-content ol { margin: 0.9rem 0 0.9rem 1.4rem; }
+.post-content li { margin: 0.3rem 0; color: var(--text); line-height: 1.7; }
+
 .post-content pre {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 1.2rem;
+  padding: 1.2rem 1.4rem;
   overflow-x: auto;
   margin: 1.5rem 0;
 }
@@ -137,15 +192,19 @@ body {
   background: none;
   border: none;
   padding: 0;
-  font-size: 0.87rem;
-  line-height: 1.6;
+  font-size: 0.855rem;
+  line-height: 1.65;
+  color: var(--text-h);
 }
+
 .post-content blockquote {
-  border-left: 3px solid var(--accent);
+  border-left: 2px solid var(--accent-border);
   padding-left: 1rem;
   margin: 1.5rem 0;
   color: var(--text-muted);
+  font-style: italic;
 }
+
 .post-content table {
   width: 100%;
   border-collapse: collapse;
@@ -154,10 +213,16 @@ body {
 }
 .post-content th, .post-content td {
   border: 1px solid var(--border);
-  padding: 0.6rem 0.8rem;
+  padding: 0.55rem 0.8rem;
   text-align: left;
 }
-.post-content th { background: var(--surface); }
+.post-content th {
+  background: var(--surface);
+  color: var(--text-h);
+  font-weight: 600;
+}
+.post-content td { color: var(--text); }
+
 .post-content hr {
   border: none;
   border-top: 1px solid var(--border);
