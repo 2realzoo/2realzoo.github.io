@@ -1,12 +1,23 @@
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
+import type { Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { getAllSlugs, getPostBySlug, getAllPostsMeta } from '@/lib/posts'
 import TabBar from '@/app/components/TabBar'
 import GraphMini from '@/app/components/GraphMini'
+import PostTOC, { type Heading } from '@/app/components/PostTOC'
 
 export async function generateStaticParams() {
   return getAllSlugs().map(slug => ({ slug }))
+}
+
+/** Convert heading text to a URL-safe anchor ID */
+function toId(text: string) {
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s가-힣]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
 }
 
 export default async function PostPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -22,15 +33,31 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
   }
 
   // Extract headings for TOC
-  const headings: { level: number; text: string }[] = []
+  const headings: Heading[] = []
   const headingRe = /^(#{1,3})\s+(.+)$/gm
   let m: RegExpExecArray | null
   while ((m = headingRe.exec(post.content)) !== null) {
-    headings.push({ level: m[1].length, text: m[2] })
+    headings.push({ level: m[1].length, text: m[2], id: toId(m[2]) })
   }
 
   const readMins = estimateReadingTime(post.content)
   const wordCount = post.content.split(/\s+/).length
+
+  // Custom heading components that inject id= attributes
+  const mdComponents: Components = {
+    h1: ({ children }) => {
+      const text = String(children)
+      return <h1 id={toId(text)}>{children}</h1>
+    },
+    h2: ({ children }) => {
+      const text = String(children)
+      return <h2 id={toId(text)}>{children}</h2>
+    },
+    h3: ({ children }) => {
+      const text = String(children)
+      return <h3 id={toId(text)}>{children}</h3>
+    },
+  }
 
   return (
     <>
@@ -42,19 +69,13 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
 
           {headings.length > 0 && (
             <div>
-              <div className="sidebar-section-title">{"// contents"}</div>
-              <ol className="toc-list">
-                {headings.slice(0, 8).map((h, i) => (
-                  <li key={i} className={i === 0 ? 'active' : ''}>
-                    {i + 1}. {h.text}
-                  </li>
-                ))}
-              </ol>
+              <div className="sidebar-section-title">{'// contents'}</div>
+              <PostTOC headings={headings} />
             </div>
           )}
 
           <div>
-            <div className="sidebar-section-title">{"// meta"}</div>
+            <div className="sidebar-section-title">{'// meta'}</div>
             <div className="post-meta-list">
               date · <span className="meta-val">{post.date}</span><br />
               category · <span className="meta-cat">{post.category ?? '회고'}</span><br />
@@ -86,7 +107,7 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
             <hr className="post-divider" />
 
             <div className="post-body">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
                 {post.content}
               </ReactMarkdown>
             </div>
@@ -114,7 +135,7 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
         {/* Right sidebar */}
         <aside className="post-sidebar-right">
           <div>
-            <div className="sidebar-section-title">{"// local_graph"}</div>
+            <div className="sidebar-section-title">{'// local_graph'}</div>
             <GraphMini
               currentSlug={slug}
               posts={allPosts.map(p => ({ slug: p.slug, title: p.title, tags: p.tags, summary: p.summary }))}
@@ -130,7 +151,7 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
 
           {allPosts.length > 1 && (
             <div>
-              <div className="sidebar-section-title">{"// linked_notes"}</div>
+              <div className="sidebar-section-title">{'// linked_notes'}</div>
               {allPosts.filter(p => p.slug !== slug).slice(0, 4).map(p => (
                 <Link key={p.slug} href={`/post/${p.slug}`} className="linked-note">
                   <div className="linked-note-id">{p.date}</div>
@@ -141,7 +162,7 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
           )}
 
           <div>
-            <div className="sidebar-section-title">{"// actions"}</div>
+            <div className="sidebar-section-title">{'// actions'}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <Link href="/" className="action-btn">← back to posts</Link>
               <Link href="/graph" className="action-btn">⌘G open graph</Link>
