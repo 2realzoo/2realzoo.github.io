@@ -11,15 +11,6 @@ export async function generateStaticParams() {
   return getAllSlugs().map(slug => ({ slug }))
 }
 
-/** Convert heading text to a URL-safe anchor ID */
-function toId(text: string) {
-  return text
-    .toLowerCase()
-    .replace(/[^\w\s가-힣]/g, '')
-    .trim()
-    .replace(/\s+/g, '-')
-}
-
 export default async function PostPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const post = getPostBySlug(slug)
@@ -32,31 +23,28 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
     return Math.max(3, Math.round(content.split(/\s+/).length / 200))
   }
 
-  // Extract headings for TOC
+  // Extract headings for TOC — use sequential index as ID so TOC and
+  // rendered headings always match regardless of text content variations.
   const headings: Heading[] = []
   const headingRe = /^(#{1,3})\s+(.+)$/gm
   let m: RegExpExecArray | null
+  let hCount = 0
   while ((m = headingRe.exec(post.content)) !== null) {
-    headings.push({ level: m[1].length, text: m[2], id: toId(m[2]) })
+    // Strip inline markdown (* ` _) from display text
+    const rawText = m[2].replace(/[*_`]/g, '').trim()
+    headings.push({ level: m[1].length, text: rawText, id: `h-${hCount++}` })
   }
 
   const readMins = estimateReadingTime(post.content)
   const wordCount = post.content.split(/\s+/).length
 
-  // Custom heading components that inject id= attributes
+  // Counter must match the order headings appear in the rendered output.
+  // Using a mutable ref inside the closure (server render is synchronous).
+  let renderCount = 0
   const mdComponents: Components = {
-    h1: ({ children }) => {
-      const text = String(children)
-      return <h1 id={toId(text)}>{children}</h1>
-    },
-    h2: ({ children }) => {
-      const text = String(children)
-      return <h2 id={toId(text)}>{children}</h2>
-    },
-    h3: ({ children }) => {
-      const text = String(children)
-      return <h3 id={toId(text)}>{children}</h3>
-    },
+    h1: ({ children }) => <h1 id={`h-${renderCount++}`}>{children}</h1>,
+    h2: ({ children }) => <h2 id={`h-${renderCount++}`}>{children}</h2>,
+    h3: ({ children }) => <h3 id={`h-${renderCount++}`}>{children}</h3>,
   }
 
   return (
