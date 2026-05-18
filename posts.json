@@ -1,0 +1,40 @@
+[
+  {
+    "slug": "vdb-vs-vlm-cost",
+    "title": "RAG 시스템 비용 최적화: VDB 파이프라인 vs VLM 직접 처리",
+    "date": "2026-03-31",
+    "tags": [
+      "rag",
+      "vdb",
+      "vlm",
+      "cost",
+      "architecture"
+    ],
+    "summary": "LLM 기반 리랭커가 포함된 VDB 파이프라인과 VLM 직접 처리 방식의 실제 비용을 계산하고 비교했습니다. 결론은 생각보다 훨씬 큰 차이였습니다."
+  },
+  {
+    "slug": "pdf-parser-comparison",
+    "title": "RAG를 위한 PDF 파서 선택 가이드: Docling vs Azure DI vs opendataloader",
+    "date": "2026-03-30",
+    "tags": [
+      "rag",
+      "pdf",
+      "parser",
+      "docling",
+      "azure"
+    ],
+    "summary": "RAG 파이프라인에 PDF 파서를 도입할 때 Docling, Azure Document Intelligence, opendataloader 세 가지를 직접 테스트한 결과를 정리했습니다."
+  },
+  {
+    "slug": "reward-hacking",
+    "title": "Reward Hacking: LLM 강화학습의 함정",
+    "date": "2026-03-27",
+    "tags": [
+      "rl",
+      "llm",
+      "rlhf",
+      "ml"
+    ],
+    "summary": "강화학습 기반 LLM에서 발생하는 Reward Hacking이 무엇인지, 왜 문제인지, 어떻게 완화할 수 있는지 정리했습니다."
+  }
+]
