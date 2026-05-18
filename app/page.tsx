@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import TabBar from './components/TabBar'
+import GraphMini from './components/GraphMini'
 import { getAllPostsMeta, PostMeta } from '@/lib/posts'
 
 const ASCII_LOGO = ` ████████  ██████   ███████   █████   ██       ███████   ███████   ███████
@@ -163,11 +164,16 @@ export default function Home() {
               <span className="sidebar-box-title">{'// graph'}</span>
               <span className="sidebar-box-sub">{posts.length} nodes</span>
             </div>
-            <div className="graph-mini-placeholder">
-              <Link href="/graph" style={{ color: 'var(--accent)', textDecoration: 'none', fontFamily: 'var(--mono)', fontSize: 11 }}>
-                open graph →
-              </Link>
-            </div>
+            <GraphMini
+              posts={posts.map(p => ({ slug: p.slug, title: p.title, tags: p.tags, summary: p.summary }))}
+              height={110}
+            />
+            <Link
+              href="/graph"
+              style={{ display: 'block', textAlign: 'right', fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--ink-mute)', textDecoration: 'none', marginTop: 4 }}
+            >
+              full graph →
+            </Link>
           </div>
 
           {/* Tag frequency */}

@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { getAllSlugs, getPostBySlug, getAllPostsMeta } from '@/lib/posts'
 import TabBar from '@/app/components/TabBar'
+import GraphMini from '@/app/components/GraphMini'
 
 export async function generateStaticParams() {
   return getAllSlugs().map(slug => ({ slug }))
@@ -114,11 +115,17 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
         <aside className="post-sidebar-right">
           <div>
             <div className="sidebar-section-title">{"// local_graph"}</div>
-            <div style={{ height: 160, border: '1.5px solid var(--line)', background: 'var(--card)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Link href="/graph" style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--accent)', textDecoration: 'none' }}>
-                open graph →
-              </Link>
-            </div>
+            <GraphMini
+              currentSlug={slug}
+              posts={allPosts.map(p => ({ slug: p.slug, title: p.title, tags: p.tags, summary: p.summary }))}
+              height={160}
+            />
+            <Link
+              href="/graph"
+              style={{ display: 'block', textAlign: 'right', fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--ink-mute)', textDecoration: 'none', marginTop: 4 }}
+            >
+              full graph →
+            </Link>
           </div>
 
           {allPosts.length > 1 && (
