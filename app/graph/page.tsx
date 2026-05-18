@@ -1,14 +1,14 @@
 import { getAllSlugs, getPostBySlug, extractWikilinks } from '@/lib/posts'
 import GraphClient, { type GraphPost, type GraphCategory } from './GraphClient'
+import TabBar from '@/app/components/TabBar'
 
 const CATEGORY_COLORS = [
-  'oklch(0.5 0.08 265)',   // blue-purple
-  'oklch(0.55 0.09 145)',  // green
-  'oklch(0.55 0.1 40)',    // orange
-  'oklch(0.55 0.08 310)',  // pink
-  'oklch(0.55 0.05 90)',   // yellow-green
-  'oklch(0.5 0.1 200)',    // teal
-  'oklch(0.5 0.09 350)',   // red
+  '#2a1aff',  // electric blue
+  '#0a8a3a',  // green
+  '#d8731d',  // amber
+  '#8b1da0',  // magenta
+  '#1d6dcc',  // blue
+  '#c0392b',  // red
 ]
 
 export default function GraphPage() {
@@ -30,7 +30,6 @@ export default function GraphPage() {
     }
   })
 
-  // Derive categories with stable color assignment
   const catSet = new Set(posts.map(p => p.cat))
   const categories: Record<string, GraphCategory> = {}
   let colorIdx = 0
@@ -41,5 +40,12 @@ export default function GraphPage() {
     }
   })
 
-  return <GraphClient posts={posts} categories={categories} />
+  return (
+    <>
+      <TabBar />
+      <div className="graph-page">
+        <GraphClient posts={posts} categories={categories} />
+      </div>
+    </>
+  )
 }

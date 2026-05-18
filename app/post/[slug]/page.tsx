@@ -1,283 +1,148 @@
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
-import type { Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { getAllSlugs, getPostBySlug } from '@/lib/posts'
-import type { Metadata } from 'next'
-import type React from 'react'
-import PostClient from './PostClient'
-import './post.css'
-
-// ── Utilities ──────────────────────────────────────────────────────────────
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^\w\s가-힣\u3040-\u30FF-]/g, '')
-    .trim()
-    .replace(/\s+/g, '-')
-    .replace(/--+/g, '-')
-}
-
-function getNodeText(node: React.ReactNode): string {
-  if (!node) return ''
-  if (typeof node === 'string') return node
-  if (typeof node === 'number') return String(node)
-  if (Array.isArray(node)) return node.map(getNodeText).join('')
-  if (typeof node === 'object' && 'props' in (node as object)) {
-    return getNodeText((node as { props?: { children?: React.ReactNode } }).props?.children)
-  }
-  return ''
-}
-
-/** Extract H2 headings from raw markdown for the TOC */
-function extractH2s(markdown: string): Array<{ id: string; text: string }> {
-  const headings: Array<{ id: string; text: string }> = []
-  const re = /^##\s+(.+)$/gm
-  let m
-  while ((m = re.exec(markdown)) !== null) {
-    const raw = m[1]
-      .replace(/\*{1,2}(.+?)\*{1,2}/g, '$1')
-      .replace(/`(.+?)`/g, '$1')
-      .trim()
-    headings.push({ id: slugify(raw), text: raw })
-  }
-  return headings
-}
-
-/**
- * Pre-process Obsidian-flavored markdown:
- * - [[wikilink]] → [wikilink](wikilink:wikilink)
- * - #hashtag (preceded by space) → [#hashtag](hashtag:hashtag)
- */
-function preprocessMarkdown(content: string): string {
-  // Wikilinks
-  content = content.replace(/\[\[([^\]]+)\]\]/g, '[$1](wikilink:$1)')
-  // Inline hashtags (not at line start → avoids heading syntax)
-  content = content.replace(
-    /(?<=[ \t])#([a-zA-Z가-힣][a-zA-Z0-9가-힣_-]*)/g,
-    '[#$1](hashtag:$1)'
-  )
-  return content
-}
-
-function formatDateKo(dateStr: string): string {
-  if (!dateStr) return ''
-  const parts = dateStr.split('-')
-  if (parts.length !== 3) return dateStr
-  return `${parts[0]}. ${parts[1]}. ${parts[2]}`
-}
-
-function calcReadingTime(content: string): number {
-  return Math.max(1, Math.ceil(content.trim().split(/\s+/).length / 200))
-}
-
-// ── Markdown component overrides ────────────────────────────────────────────
-
-const mdComponents: Components = {
-  h2: ({ children, ...rest }) => {
-    const text = getNodeText(children)
-    return (
-      <h2 id={slugify(text)} {...rest}>
-        {children}
-      </h2>
-    )
-  },
-  h3: ({ children, ...rest }) => {
-    const text = getNodeText(children)
-    return (
-      <h3 id={slugify(text)} {...rest}>
-        {children}
-      </h3>
-    )
-  },
-  a: ({ href, children }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { children?: React.ReactNode }) => {
-    if (href?.startsWith('wikilink:')) {
-      return <a className="rz-wikilink" href="#">{children}</a>
-    }
-    if (href?.startsWith('hashtag:')) {
-      return <a className="rz-hashtag" href="#">{children}</a>
-    }
-    return (
-      <a className="rz-link" href={href} target="_blank" rel="noopener noreferrer">
-        {children}
-      </a>
-    )
-  },
-  pre: ({ children }) => <pre className="rz-code-block">{children}</pre>,
-  // Remove the default 'table' wrapper — let article css handle it
-}
-
-// ── Route ──────────────────────────────────────────────────────────────────
-
-interface Props {
-  params: Promise<{ slug: string }>
-}
+import { getAllSlugs, getPostBySlug, getAllPostsMeta } from '@/lib/posts'
+import TabBar from '@/app/components/TabBar'
 
 export async function generateStaticParams() {
   return getAllSlugs().map(slug => ({ slug }))
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export default async function PostPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const post = getPostBySlug(slug)
-  return {
-    title: `${post.title} — realzoojin`,
-    description: post.deck ?? post.summary,
+  const allPosts = getAllPostsMeta()
+  const idx = allPosts.findIndex(p => p.slug === slug)
+  const prev = idx < allPosts.length - 1 ? allPosts[idx + 1] : null
+  const next = idx > 0 ? allPosts[idx - 1] : null
+
+  function estimateReadingTime(content: string) {
+    return Math.max(3, Math.round(content.split(/\s+/).length / 200))
   }
-}
 
-export default async function PostPage({ params }: Props) {
-  const { slug } = await params
-  const post = getPostBySlug(slug)
+  // Extract headings for TOC
+  const headings: { level: number; text: string }[] = []
+  const headingRe = /^(#{1,3})\s+(.+)$/gm
+  let m: RegExpExecArray | null
+  while ((m = headingRe.exec(post.content)) !== null) {
+    headings.push({ level: m[1].length, text: m[2] })
+  }
 
-  const headings = extractH2s(post.content)
-  const processedContent = preprocessMarkdown(post.content)
-  const readingTime = post.readingTime ?? calcReadingTime(post.content)
-  const dateKo = formatDateKo(post.date)
-
-  const hasStack = post.stack && Object.keys(post.stack).length > 0
+  const readMins = estimateReadingTime(post.content)
+  const wordCount = post.content.split(/\s+/).length
 
   return (
-    <div className="rz-post">
-      {/* Topbar */}
-      <header className="rz-topbar">
-        <Link href="/" className="rz-brand">
-          real<em>zoojin</em><span className="rz-dot" />
-        </Link>
-        <div className="rz-crumbs">
-          <Link href="/">글</Link>
-          {post.category && (
-            <>
-              <span className="sep">/</span>
-              <span>{post.category}</span>
-            </>
-          )}
-          <span className="sep">/</span>
-          <span className="here">
-            {post.issue ? `№ ${post.issue} · ` : ''}{post.title}
-          </span>
-        </div>
-        <div className="rz-top-actions">
-          <Link href="/graph" className="rz-btn">◌ 그래프 뷰</Link>
-        </div>
-      </header>
+    <>
+      <TabBar />
+      <div className="post-layout">
+        {/* Left sidebar — TOC + meta */}
+        <aside className="post-sidebar-left">
+          <Link href="/" className="post-back-btn">← back</Link>
 
-      {/* Three-column shell */}
-      <div className="rz-shell">
-        {/* Column 1: TOC — rendered by client component for interactivity */}
-        <PostClient headings={headings} />
-
-        {/* Column 2: Article */}
-        <article>
-          {/* Kicker */}
-          {(post.category || post.issue) && (
-            <div className="rz-kicker">
-              {post.category && <span className="cat">{post.category}</span>}
-              {post.issue && (
-                <>
-                  <span className="sep">·</span>
-                  <span>Issue № {post.issue}</span>
-                </>
-              )}
-              <span className="sep">·</span>
-              <span>{readingTime} min read</span>
-              {post.date && (
-                <>
-                  <span className="sep">·</span>
-                  <span>Updated {post.date}</span>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Title */}
-          <h1 className="rz-title">{post.title}</h1>
-
-          {/* Deck / subtitle */}
-          {post.deck && <p className="rz-deck">{post.deck}</p>}
-
-          {/* Byline */}
-          <div className="rz-byline">
-            <div className="rz-avatar">Z</div>
-            <div className="rz-byline-who">
-              <b>realzoojin</b><br />
-              <span>{dateKo}</span>
-            </div>
-            {post.category && (
-              <div className="rz-byline-loc">{post.category}</div>
-            )}
-          </div>
-
-          {/* Markdown body */}
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            components={mdComponents}
-          >
-            {processedContent}
-          </ReactMarkdown>
-        </article>
-
-        {/* Column 3: Meta sidebar */}
-        <aside className="rz-meta-side">
-          {/* Metadata */}
-          <div className="rz-meta-block">
-            <div className="rz-eyebrow">Metadata</div>
-            {post.date && (
-              <div className="rz-kv">
-                <span className="rz-kv-label">Published</span>
-                <span>{dateKo}</span>
-              </div>
-            )}
-            <div className="rz-kv">
-              <span className="rz-kv-label">Reading</span>
-              <span>{readingTime} minutes</span>
-            </div>
-            {post.category && (
-              <div className="rz-kv">
-                <span className="rz-kv-label">Category</span>
-                <span>{post.category}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Tags */}
-          {post.tags.length > 0 && (
-            <div className="rz-meta-block">
-              <div className="rz-eyebrow">Tags</div>
-              <div className="rz-tags">
-                {post.tags.map(tag => (
-                  <a key={tag} href="#" className="rz-tag-pill">{tag}</a>
+          {headings.length > 0 && (
+            <div>
+              <div className="sidebar-section-title">{"// contents"}</div>
+              <ol className="toc-list">
+                {headings.slice(0, 8).map((h, i) => (
+                  <li key={i} className={i === 0 ? 'active' : ''}>
+                    {i + 1}. {h.text}
+                  </li>
                 ))}
-              </div>
+              </ol>
             </div>
           )}
 
-          {/* Stack — optional, hidden when no stack frontmatter */}
-          {hasStack && (
-            <div className="rz-meta-block">
-              <div className="rz-eyebrow">Stack</div>
-              {Object.entries(post.stack!).map(([key, val]) => (
-                <div key={key} className="rz-kv">
-                  <span className="rz-kv-label">{key}</span>
-                  <span>{val}</span>
-                </div>
+          <div>
+            <div className="sidebar-section-title">{"// meta"}</div>
+            <div className="post-meta-list">
+              date · <span className="meta-val">{post.date}</span><br />
+              category · <span className="meta-cat">{post.category ?? '회고'}</span><br />
+              reading · <span className="meta-val">{readMins} min</span><br />
+              words · <span className="meta-val">{wordCount}</span>
+            </div>
+          </div>
+        </aside>
+
+        {/* Center — article */}
+        <main className="post-main">
+          <article className="post-article">
+            <div className="post-header-meta">
+              <span>[{slug.toUpperCase().slice(0, 8)}] · {post.date}</span>
+              <span className="meta-cat">{post.category ?? '회고'}</span>
+            </div>
+
+            <h1 className="post-title">{post.title}</h1>
+            {post.summary && (
+              <div className="post-en-title" style={{ fontStyle: 'italic' }}>{post.summary.slice(0, 80)}</div>
+            )}
+
+            <div className="post-tags">
+              {post.tags.map(t => (
+                <Link key={t} href={`/tags?t=${t}`} className="post-tag" style={{ textDecoration: 'none' }}>#{t}</Link>
+              ))}
+            </div>
+
+            <hr className="post-divider" />
+
+            <div className="post-body">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {post.content}
+              </ReactMarkdown>
+            </div>
+
+            {/* Prev / Next */}
+            {(prev || next) && (
+              <nav className="post-nav">
+                {prev ? (
+                  <Link href={`/post/${prev.slug}`} className="post-nav-item">
+                    <div className="post-nav-label">← prev</div>
+                    <div className="post-nav-title">{prev.title}</div>
+                  </Link>
+                ) : <div />}
+                {next ? (
+                  <Link href={`/post/${next.slug}`} className="post-nav-item next">
+                    <div className="post-nav-label">next →</div>
+                    <div className="post-nav-title">{next.title}</div>
+                  </Link>
+                ) : <div />}
+              </nav>
+            )}
+          </article>
+        </main>
+
+        {/* Right sidebar */}
+        <aside className="post-sidebar-right">
+          <div>
+            <div className="sidebar-section-title">{"// local_graph"}</div>
+            <div style={{ height: 160, border: '1.5px solid var(--line)', background: 'var(--card)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Link href="/graph" style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--accent)', textDecoration: 'none' }}>
+                open graph →
+              </Link>
+            </div>
+          </div>
+
+          {allPosts.length > 1 && (
+            <div>
+              <div className="sidebar-section-title">{"// linked_notes"}</div>
+              {allPosts.filter(p => p.slug !== slug).slice(0, 4).map(p => (
+                <Link key={p.slug} href={`/post/${p.slug}`} className="linked-note">
+                  <div className="linked-note-id">{p.date}</div>
+                  <div className="linked-note-title">{p.title}</div>
+                </Link>
               ))}
             </div>
           )}
 
-          {/* Share */}
-          <div className="rz-meta-block">
-            <div className="rz-eyebrow">Share</div>
-            <button className="rz-share-btn">
-              링크 복사 <span className="rz-share-mk">⌘L</span>
-            </button>
-            <button className="rz-share-btn">
-              RSS로 보기 <span className="rz-share-mk">↗</span>
-            </button>
+          <div>
+            <div className="sidebar-section-title">{"// actions"}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <Link href="/" className="action-btn">← back to posts</Link>
+              <Link href="/graph" className="action-btn">⌘G open graph</Link>
+              <Link href={`/tags?t=${post.tags[0] ?? ''}`} className="action-btn primary">↗ related posts</Link>
+            </div>
           </div>
         </aside>
       </div>
-    </div>
+    </>
   )
 }

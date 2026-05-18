@@ -1,275 +1,185 @@
 import Link from 'next/link'
-import { getAllPostsMeta } from '@/lib/posts'
-import LandingNewsletter from './LandingNewsletter'
-import './landing.css'
-import type React from 'react'
+import TabBar from './components/TabBar'
+import { getAllPostsMeta, PostMeta } from '@/lib/posts'
 
-// Mini graph data (static preview)
-const GRAPH_NODES = [
-  {x:40, y:40}, {x:90, y:70}, {x:140, y:30}, {x:170, y:80}, {x:200, y:45},
-  {x:70, y:110}, {x:120, y:100}, {x:180, y:115}, {x:50, y:80},
-]
-const GRAPH_EDGES = [[0,1],[1,2],[2,3],[3,4],[1,5],[5,6],[6,7],[1,6],[0,8],[8,5]] as const
+const ASCII_LOGO = ` ████████  ██████   ███████   █████   ██       ███████   ███████   ███████
+ ██     ██ ██   ██  ██       ██   ██  ██           ██   ██   ██  ██     ██
+    ██     █████    ███████  ███████  ██        ███     ██   ██  ██     ██
+   ██      ██   ██  ██       ██   ██  ██       ██       ██   ██  ██     ██
+ ████████  ██   ██  ███████  ██   ██  ███████  ███████   ███████   ███████`
 
-/** Render [[wikilinks]] in titles as accent italic spans */
-function renderTitle(title: string): React.ReactNode {
-  const parts = title.split(/\[\[([^\]]+)\]\]/)
-  return parts.map((part, i) =>
-    i % 2 === 1
-      ? <span key={i} className="rl-acc">{part}</span>
-      : part
+function estimateReadingTime(summary: string): string {
+  const words = summary.split(/\s+/).length
+  const mins = Math.max(3, Math.round(words / 200) + 3)
+  return `${mins} min`
+}
+
+function TagFreqBar({ tags, posts }: { tags: string[], posts: PostMeta[] }) {
+  const tagCount: Record<string, number> = {}
+  posts.forEach(p => p.tags.forEach(t => { tagCount[t] = (tagCount[t] || 0) + 1 }))
+  const sorted = Object.entries(tagCount).sort((a, b) => b[1] - a[1]).slice(0, 6)
+  const max = sorted[0]?.[1] || 1
+
+  return (
+    <div style={{ fontFamily: 'var(--mono)', fontSize: 11 }}>
+      {sorted.map(([name, count]) => {
+        const w = Math.round((count / max) * 16)
+        return (
+          <div key={name} className="tag-freq-row">
+            <span className="tag-freq-name">#{name}</span>
+            <span>
+              <span className="tag-freq-bar-filled">{'▮'.repeat(w)}</span>
+              <span className="tag-freq-bar-empty">{'·'.repeat(16 - w)}</span>
+            </span>
+            <span className="tag-freq-count">{count}</span>
+          </div>
+        )
+      })}
+    </div>
   )
 }
 
-/** Format date for display */
-function fmtDate(dateStr: string): string {
-  if (!dateStr) return ''
-  const [y, m, d] = dateStr.split('-')
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-  return `${months[parseInt(m,10)-1]} ${parseInt(d,10)}, ${y}`
-}
-
-export default function HomePage() {
+export default function Home() {
   const posts = getAllPostsMeta()
-
-  // Aggregate real tags from posts
-  const tagCounts: Record<string, number> = {}
-  posts.forEach(p => p.tags.forEach(t => { tagCounts[t] = (tagCounts[t] ?? 0) + 1 }))
-  const realTags = Object.entries(tagCounts).sort((a, b) => b[1] - a[1])
-
-  // Aggregate real categories from posts
-  const catCounts: Record<string, number> = {}
-  posts.forEach(p => { if (p.category) catCounts[p.category] = (catCounts[p.category] ?? 0) + 1 })
-  const sidebarCategories = Object.entries(catCounts).sort((a, b) => b[1] - a[1])
+  const featured = posts[0]
+  const rest = posts.slice(1, 3)
 
   return (
-    <div className="rl-landing">
+    <>
+      <TabBar />
 
-      {/* ── Nav ── */}
-      <nav className="rl-nav">
-        <div className="rl-nav-left">
-          <a href="#list">글</a>
-          <a href="#categories">주제</a>
-          <Link href="/graph">그래프 뷰</Link>
-          <a href="#about">소개</a>
-          <a href="#">RSS</a>
+      {/* Hero */}
+      <div className="home-hero">
+        <div className="home-hero-cmd">
+          <span className="cmd-accent">$</span>{' '}
+          cat{' '}
+          <span style={{ color: 'var(--ink)' }}>~/2realzoo/README.md</span>
         </div>
-        <Link href="/" className="rl-brand">
-          real<em>zoojin</em><span className="rl-dot" />
-        </Link>
-        <div className="rl-nav-right">
-          <div className="rl-search">
-            <span>글 검색</span>
-            <span className="rl-kbd">⌘K</span>
-          </div>
-          <a className="rl-btn" href="#news">구독하기 ↗</a>
-        </div>
-      </nav>
-
-      {/* ── Hero ── */}
-      <section className="rl-hero">
-        <h1>
-          현장에서 쓰는<br />
-          <span className="rl-accent">AI 트랜스포메이션</span><br />
-          노트.
-        </h1>
-        <div className="rl-hero-side">
-          <div className="rl-eyebrow">The Blog · EST. 2023</div>
-          <p>제품에 AI를 붙여 나가는 일을 하며 남기는 기록입니다. 주로 소프트웨어 엔지니어링, 가끔 LLM · ML 연구 리뷰. 데모와 출시 사이의 길고 지루한 중간 지점에서 배운 것들을 정리합니다.</p>
-          <div className="rl-cta-row">
-            {posts[0] && (
-              <Link className="rl-btn" href={`/post/${posts[0].slug}`}>
-                최근 글 읽기
-                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4">
-                  <path d="M4 12 L12 4 M6 4 H12 V10" />
-                </svg>
-              </Link>
-            )}
-            <Link className="rl-btn ghost" href="/graph">그래프 뷰 ↗</Link>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Latest posts + Sidebar ── */}
-      <section className="rl-latest-wrap">
-        <div id="list">
-          <div className="rl-latest-head">
-            <h3>최신 글</h3>
-            <div className="rl-latest-count">
-              SHOWING {String(posts.length).padStart(2, '0')} · UPDATED {posts[0]?.date ?? ''}
-            </div>
-          </div>
-
-          <div className="rl-post-list">
-            {posts.length === 0 && (
-              <div style={{ padding: '40px 0', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '12px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-                아직 글이 없습니다 — posts/ 폴더에 .md 파일을 추가하세요
-              </div>
-            )}
-            {posts.map((post, idx) => (
-              <Link
-                key={post.slug}
-                href={`/post/${post.slug}`}
-                className="rl-post-row"
-              >
-                <div className="rl-post-num">
-                  № {String(posts.length - idx).padStart(3, '0')}
-                </div>
-                <div className="rl-post-body">
-                  <h4>{renderTitle(post.title)}</h4>
-                  {post.summary && <p>{post.summary}</p>}
-                </div>
-                <div className="rl-post-meta">
-                  {post.category && (
-                    <span className="cat">{post.category}</span>
-                  )}
-                  {!post.category && post.tags[0] && (
-                    <span className="cat">{post.tags[0]}</span>
-                  )}
-                  <br />
-                  {fmtDate(post.date)}
-                </div>
-                <span className="rl-post-arrow">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4">
-                    <path d="M4 12 L12 4 M6 4 H12 V10" />
-                  </svg>
-                </span>
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        {/* ── Sidebar ── */}
-        <aside className="rl-sidebar">
-
-          {/* Categories */}
-          {sidebarCategories.length > 0 && (
-            <div id="categories">
-              <h5>카테고리</h5>
-              <div className="rl-cats">
-                {sidebarCategories.map(([name, count]) => (
-                  <a key={name} href="#list" className="rl-cat-row">
-                    <span className="rl-cat-name">{name}</span>
-                    <span className="rl-cat-cnt">{count}</span>
-                  </a>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Tags */}
-          {realTags.length > 0 && (
-            <div>
-              <h5>태그</h5>
-              <div className="rl-tag-cloud">
-                {realTags.map(([name, count]) => (
-                  <a key={name} href="#list" className="rl-tag">
-                    {name}<span className="rl-tag-ct">{count}</span>
-                  </a>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Author */}
-          <div id="about">
-            <h5>글쓴이</h5>
-            <div className="rl-author">
-              <div className="rl-author-top">
-                <div className="rl-author-avatar">Z</div>
-                <div>
-                  <div className="rl-author-name">real<em>zoojin</em></div>
-                  <div className="rl-author-role">Staff Eng · AI Platform</div>
-                </div>
-              </div>
-              <p>중간 규모 SaaS에서 AI 기능을 만들고 있습니다. Obsidian 노트에 묵히는 설계 스케치, 평가 회고, 가끔 논문 재독 메모를 이곳에 옮겨 둡니다. 주로 소프트웨어 엔지니어링, 가끔 연구 쪽도.</p>
-              <div className="rl-author-links">
-                <a href="#">GitHub ↗</a>
-                <a href="#">X ↗</a>
-                <a href="#">CV ↗</a>
-              </div>
-            </div>
-          </div>
-
-          {/* Graph preview card */}
-          <Link href="/graph" className="rl-graph-card">
-            <h5 style={{ marginBottom: '10px' }}>지식 그래프</h5>
-            <div className="rl-graph-mini">
-              <svg width="100%" height="100%" viewBox="0 0 240 140">
-                {GRAPH_EDGES.map(([a, b], i) => (
-                  <line
-                    key={i}
-                    x1={GRAPH_NODES[a].x} y1={GRAPH_NODES[a].y}
-                    x2={GRAPH_NODES[b].x} y2={GRAPH_NODES[b].y}
-                    stroke="#D9D5CB" strokeWidth="1"
-                  />
-                ))}
-                {GRAPH_NODES.map((n, i) => (
-                  <circle
-                    key={i}
-                    cx={n.x} cy={n.y}
-                    r={i === 1 ? 6 : i === 5 ? 5 : 3.5}
-                    fill={i === 1 ? 'oklch(0.5 0.08 265)' : '#2A2A2E'}
-                  />
-                ))}
-              </svg>
-            </div>
-            <h6>노트 사이의 연결을 탐색</h6>
-            <p>
-              Obsidian에서 쓰는 것처럼 글 사이의{' '}
-              <span className="rl-wiki">{'[[wikilinks]]'}</span>를 시각화합니다.
-            </p>
-            <span className="rl-btn-sm">Open Graph ↗</span>
-          </Link>
-
-          {/* Newsletter */}
-          <div id="news">
-            <h5>뉴스레터</h5>
-            <div className="rl-news">
-              <h6>격주 화요일,<br />글 한 편<em> 씩</em>.</h6>
-              <p>프로덕션에서의 AI에 대한 장문 노트. 툴 홍보 없음, 하이프 없음, 링크 모음집 없음.</p>
-              <LandingNewsletter />
-              <div className="rl-news-foot">UNSUB ANY TIME · NO TRACKING</div>
-            </div>
-          </div>
-
-        </aside>
-      </section>
-
-      {/* ── Footer ── */}
-      <footer className="rl-footer">
-        <div className="rl-footer-top">
+        <div className="home-hero-ascii">{ASCII_LOGO}</div>
+        <div className="home-hero-sub">
           <div>
-            <div className="rl-footer-brand">real<em>zoojin</em></div>
-            <div className="rl-footer-tagline">제품에 AI를 붙여 나가는 일을 하며 남기는 기록. 주로 소프트웨어, 가끔 연구.</div>
+            <div className="home-hero-tagline">field notes from an ML/Backend engineer.</div>
+            <div className="home-hero-desc">
+              모델보다 평가셋, 추론보다 파이프라인을 더 좋아합니다. 매주 한 편의 회고와 한 달에 한 편의 논문 정리.
+            </div>
           </div>
-          <div className="rl-footer-col">
-            <h6>글</h6>
-            <a href="#list">최신</a>
-            <a href="#list">전체 보기</a>
+          <div className="home-hero-stats">
+            {'// '}{posts.length}{' entries'}<br />
+            {'// '}{Array.from(new Set(posts.flatMap(p => p.tags))).length}{' tags'}<br />
+            {'// since 2024'}
           </div>
-          <div className="rl-footer-col">
-            <h6>주제</h6>
-            {sidebarCategories.slice(0, 4).map(([name]) => (
-              <a key={name} href="#list">{name}</a>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="home-body">
+        {/* Posts */}
+        <div className="home-posts">
+          <div className="home-posts-header">
+            <div>
+              <span className="home-posts-title">LATEST</span>
+              <span className="home-posts-title-serif">posts</span>
+            </div>
+            <span className="home-posts-count">showing 1–{Math.min(3, posts.length)} of {posts.length}</span>
+          </div>
+
+          {featured && (
+            <Link href={`/post/${featured.slug}`} className="post-card featured">
+              <div className="post-card-meta">
+                <span>[{featured.slug.toUpperCase().slice(0, 6)}] {featured.date}</span>
+                <span className="post-card-meta-cat">{featured.category ?? '회고'}</span>
+              </div>
+              <h2 className="post-card-title">{featured.title}</h2>
+              <div className="post-card-en" style={{ fontStyle: 'italic' }}>{featured.summary.slice(0, 60)}</div>
+              <p className="post-card-excerpt">{featured.summary}</p>
+              <div className="post-card-footer">
+                <div className="post-card-tags">
+                  {featured.tags.slice(0, 3).map(t => (
+                    <span key={t} className="post-tag">#{t}</span>
+                  ))}
+                </div>
+                <span className="post-card-reading">{estimateReadingTime(featured.summary)}</span>
+              </div>
+            </Link>
+          )}
+
+          <div className="posts-grid">
+            {rest.map(post => (
+              <Link key={post.slug} href={`/post/${post.slug}`} className="post-card">
+                <div className="post-card-meta">
+                  <span>{post.date}</span>
+                  <span className="post-card-meta-cat">{post.category ?? '회고'}</span>
+                </div>
+                <h3 className="post-card-title">{post.title}</h3>
+                <p className="post-card-excerpt">{post.summary}</p>
+                <div className="post-card-footer">
+                  <div className="post-card-tags">
+                    {post.tags.slice(0, 2).map(t => (
+                      <span key={t} className="post-tag">#{t}</span>
+                    ))}
+                  </div>
+                  <span className="post-card-reading">{estimateReadingTime(post.summary)}</span>
+                </div>
+              </Link>
             ))}
           </div>
-          <div className="rl-footer-col">
-            <h6>다른 곳</h6>
-            <Link href="/graph">그래프 뷰</Link>
-            <a href="#">GitHub ↗</a>
-            <a href="#">X ↗</a>
-            <a href="#">RSS ↗</a>
-          </div>
-        </div>
-        <div className="rl-footer-mid">
-          <div>© 2026 realzoojin · CC-BY 4.0</div>
-          <div className="center">Writing in Seoul</div>
-          <div className="right">contact</div>
-        </div>
-        <div className="rl-footer-wordmark">realzoojin</div>
-      </footer>
 
-    </div>
+          {posts.length > 3 && (
+            <Link
+              href="/posts"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                fontFamily: 'var(--mono)',
+                fontSize: 12,
+                color: 'var(--ink-mute)',
+                textDecoration: 'none',
+                padding: '6px 0',
+              }}
+            >
+              $ ls posts/ <span style={{ color: 'var(--accent)' }}>→ {posts.length} entries</span>
+            </Link>
+          )}
+        </div>
+
+        {/* Sidebar */}
+        <aside className="home-sidebar">
+          {/* Terminal command box */}
+          <div className="sidebar-cmd">
+            <div><span className="cmd-dollar">$</span> blog --sort date --desc</div>
+            <div className="cmd-ok">→ matched {posts.length} entries.</div>
+            <div>
+              <span className="cmd-dollar">$</span> filter{' '}
+              <span className="cmd-tag">#llm</span>{' '}
+              <span className="cmd-tag2">#rag</span>
+            </div>
+            <div className="cmd-ok">→ matched {posts.filter(p => p.tags.some(t => ['llm','rag'].includes(t))).length} entries.</div>
+          </div>
+
+          {/* Mini graph */}
+          <div className="sidebar-box">
+            <div className="sidebar-box-header">
+              <span className="sidebar-box-title">{'// graph'}</span>
+              <span className="sidebar-box-sub">{posts.length} nodes</span>
+            </div>
+            <div className="graph-mini-placeholder">
+              <Link href="/graph" style={{ color: 'var(--accent)', textDecoration: 'none', fontFamily: 'var(--mono)', fontSize: 11 }}>
+                open graph →
+              </Link>
+            </div>
+          </div>
+
+          {/* Tag frequency */}
+          <div className="sidebar-box">
+            <div className="sidebar-box-header">
+              <span className="sidebar-box-title">{'// tag_freq'}</span>
+              <span className="sidebar-box-sub">top 6</span>
+            </div>
+            <TagFreqBar tags={[]} posts={posts} />
+          </div>
+        </aside>
+      </div>
+    </>
   )
 }
