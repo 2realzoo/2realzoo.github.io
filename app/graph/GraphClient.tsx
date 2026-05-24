@@ -384,24 +384,6 @@ export default function GraphClient({
 
   return (
     <div className="rg-wrap">
-      {/* Topbar */}
-      <header className="rg-topbar">
-        <Link href="/" className="rg-brand">
-          real<em>zoojin</em><span className="rg-dot" />
-        </Link>
-        <div className="rg-crumbs">
-          <Link href="/">글</Link>
-          <span className="rg-sep">/</span>
-          <span className="rg-here">그래프 뷰</span>
-        </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <Link className="rg-btn" href="/">← 리스트로</Link>
-          {posts[0] && (
-            <Link className="rg-btn" href={`/post/${posts[0].slug}`}>최신 글 열기</Link>
-          )}
-        </div>
-      </header>
-
       {/* Shell */}
       <div className="rg-shell">
         {/* Left sidebar */}
