@@ -23,14 +23,16 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
     return Math.max(3, Math.round(content.split(/\s+/).length / 200))
   }
 
-  // Extract headings for TOC — use sequential index as ID so TOC and
-  // rendered headings always match regardless of text content variations.
+  // Extract headings for TOC — strip fenced code blocks first so that
+  // `#` lines inside code examples are not counted as real headings.
+  const contentForTOC = post.content
+    .replace(/^```[\s\S]*?^```/gm, '')   // fenced code blocks
+    .replace(/^~~~[\s\S]*?^~~~/gm, '')   // tilde fenced blocks
   const headings: Heading[] = []
   const headingRe = /^(#{1,3})\s+(.+)$/gm
   let m: RegExpExecArray | null
   let hCount = 0
-  while ((m = headingRe.exec(post.content)) !== null) {
-    // Strip inline markdown (* ` _) from display text
+  while ((m = headingRe.exec(contentForTOC)) !== null) {
     const rawText = m[2].replace(/[*_`]/g, '').trim()
     headings.push({ level: m[1].length, text: rawText, id: `h-${hCount++}` })
   }
