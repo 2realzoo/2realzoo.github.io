@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import * as d3 from 'd3'
 import './graph.css'
 
 export interface GraphPost {
@@ -19,416 +21,367 @@ export interface GraphCategory {
   color: string
 }
 
-interface DetailState {
-  post: GraphPost | null
-  connected: string[]
+/* ── Data model ── */
+interface GNode {
+  id: string
+  title: string
+  type: 'note' | 'tag'
+  tags: string[]
+  slug?: string
+  // D3 simulation fields
+  x?: number; y?: number; vx?: number; vy?: number; fx?: number | null; fy?: number | null
 }
 
-interface SimPost extends GraphPost {
-  x: number
-  y: number
-  vx: number
-  vy: number
-  fx?: number
-  fy?: number
+interface GLink {
+  source: string | GNode
+  target: string | GNode
+}
+
+/* Build graph data from posts */
+function buildGraph(posts: GraphPost[]) {
+  const nodes: GNode[] = []
+  const links: GLink[] = []
+  const tagSet = new Set<string>()
+
+  // Note nodes
+  posts.forEach(p => {
+    nodes.push({ id: p.id, title: p.title, type: 'note', tags: p.tags, slug: p.slug })
+    p.tags.forEach(t => tagSet.add(t))
+  })
+
+  // Tag nodes (diamond)
+  tagSet.forEach(t => {
+    nodes.push({ id: `tag:${t}`, title: `#${t}`, type: 'tag', tags: [] })
+  })
+
+  // Note → tag edges
+  posts.forEach(p => {
+    p.tags.forEach(t => {
+      links.push({ source: p.id, target: `tag:${t}` })
+    })
+  })
+
+  // Wikilink edges
+  posts.forEach(p => {
+    p.links.forEach(l => {
+      if (posts.some(q => q.id === l)) {
+        links.push({ source: p.id, target: l })
+      }
+    })
+  })
+
+  return { nodes, links }
+}
+
+/* 2-hop BFS subgraph */
+function localSubgraph(
+  allNodes: GNode[],
+  allLinks: GLink[],
+  currentId: string,
+  maxNodes = 30,
+): { nodes: GNode[]; links: GLink[] } {
+  const nodeById = new Map(allNodes.map(n => [n.id, n]))
+  const adjMap = new Map<string, Set<string>>()
+
+  allLinks.forEach(l => {
+    const s = typeof l.source === 'string' ? l.source : l.source.id
+    const t = typeof l.target === 'string' ? l.target : l.target.id
+    if (!adjMap.has(s)) adjMap.set(s, new Set())
+    if (!adjMap.has(t)) adjMap.set(t, new Set())
+    adjMap.get(s)!.add(t)
+    adjMap.get(t)!.add(s)
+  })
+
+  const visited = new Set<string>()
+  const queue: [string, number][] = [[currentId, 0]]
+  while (queue.length && visited.size < maxNodes) {
+    const [id, depth] = queue.shift()!
+    if (visited.has(id)) continue
+    visited.add(id)
+    if (depth < 2) {
+      adjMap.get(id)?.forEach(nb => {
+        if (!visited.has(nb)) queue.push([nb, depth + 1])
+      })
+    }
+  }
+
+  const subNodes = [...visited].map(id => nodeById.get(id)!).filter(Boolean)
+  const subLinks = allLinks.filter(l => {
+    const s = typeof l.source === 'string' ? l.source : l.source.id
+    const t = typeof l.target === 'string' ? l.target : l.target.id
+    return visited.has(s) && visited.has(t)
+  })
+  return { nodes: subNodes, links: subLinks }
 }
 
 export default function GraphClient({
   posts,
   categories,
+  currentSlug,
+  localMode = false,
 }: {
   posts: GraphPost[]
   categories: Record<string, GraphCategory>
+  currentSlug?: string
+  localMode?: boolean
 }) {
+  const router = useRouter()
   const svgRef = useRef<SVGSVGElement>(null)
-  const [detail, setDetail] = useState<DetailState>({ post: null, connected: [] })
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set())
   const [showLabels, setShowLabels] = useState(true)
-
-  // Refs for animation loop (avoids stale closures)
-  const selectedIdRef = useRef<string | null>(null)
-  const activeTagsRef = useRef<Set<string>>(new Set())
-  const showLabelsRef = useRef(true)
-  const alphaRef = useRef(1)
-  const rafRef = useRef<number | null>(null)
-  const updateVisualRef = useRef<(() => void) | null>(null)
-
+  const [selectedNode, setSelectedNode] = useState<GNode | null>(null)
   const allTags = [...new Set(posts.flatMap(p => p.tags))]
-  const catEntries = Object.entries(categories)
 
-  function toggleTag(tag: string) {
-    setActiveTags(prev => {
-      const next = new Set(prev)
-      if (next.has(tag)) next.delete(tag); else next.add(tag)
-      activeTagsRef.current = next
-      updateVisualRef.current?.()
-      return next
-    })
-  }
-
-  function toggleLabels(val: boolean) {
-    setShowLabels(val)
-    showLabelsRef.current = val
-    updateVisualRef.current?.()
-  }
-
-  function selectPost(id: string) {
-    const post = posts.find(p => p.id === id) ?? null
-    selectedIdRef.current = id
-    setDetail({
-      post,
-      connected: post?.links.filter(l => posts.some(p => p.id === l)) ?? [],
-    })
-    updateVisualRef.current?.()
-  }
-
-  function clearSelection() {
-    selectedIdRef.current = null
-    setDetail({ post: null, connected: [] })
-    updateVisualRef.current?.()
-  }
+  // Filter posts by active tags
+  const filteredPosts = activeTags.size === 0
+    ? posts
+    : posts.filter(p => p.tags.some(t => activeTags.has(t)))
 
   useEffect(() => {
-    const svg = svgRef.current
-    if (!svg || posts.length === 0) return
+    const svg = d3.select(svgRef.current!)
+    svg.selectAll('*').remove()
 
-    const W = 1000, H = 700
-    const NS = 'http://www.w3.org/2000/svg'
+    const el = svgRef.current!
+    const W = el.clientWidth || 900
+    const H = el.clientHeight || 600
 
-    // Initialize simulation state (mutable, outside React)
-    const byId: Record<string, SimPost> = {}
-    const cats = catEntries.map(([k]) => k)
+    const { nodes: rawNodes, links: rawLinks } = buildGraph(filteredPosts)
+    let nodes: GNode[], links: GLink[]
 
-    posts.forEach((p, i) => {
-      const ci = Math.max(0, cats.indexOf(p.cat))
-      const byCat = posts.filter(x => x.cat === p.cat)
-      const idx = byCat.findIndex(x => x.id === p.id)
-      const ang = (ci / Math.max(1, cats.length)) * Math.PI * 2 + (idx / Math.max(1, byCat.length)) * 0.9
-      const r = 180 + (i % 3) * 40
-      byId[p.id] = {
-        ...p,
-        x: W / 2 + Math.cos(ang) * r,
-        y: H / 2 + Math.sin(ang) * r,
-        vx: 0,
-        vy: 0,
+    if (localMode && currentSlug) {
+      const sub = localSubgraph(rawNodes, rawLinks, currentSlug)
+      nodes = sub.nodes
+      links = sub.links
+    } else {
+      nodes = rawNodes
+      links = rawLinks
+    }
+
+    if (nodes.length === 0) return
+
+    // Degree map for node sizing
+    const degreeMap = new Map<string, number>()
+    links.forEach(l => {
+      const s = typeof l.source === 'string' ? l.source : (l.source as GNode).id
+      const t = typeof l.target === 'string' ? l.target : (l.target as GNode).id
+      degreeMap.set(s, (degreeMap.get(s) || 0) + 1)
+      degreeMap.set(t, (degreeMap.get(t) || 0) + 1)
+    })
+
+    const nodeRadius = (n: GNode) => {
+      if (n.id === currentSlug) return 9
+      const deg = degreeMap.get(n.id) || 0
+      return n.type === 'tag' ? 5 + Math.min(deg, 5) : 4 + Math.min(deg * 0.6, 5)
+    }
+
+    // D3 force simulation
+    const simulation = d3.forceSimulation(nodes as d3.SimulationNodeDatum[])
+      .force('link', d3.forceLink(links as d3.SimulationLinkDatum<d3.SimulationNodeDatum>[])
+        .id((d: d3.SimulationNodeDatum) => (d as GNode).id)
+        .distance(d => {
+          const s = (d.source as GNode).type, t = (d.target as GNode).type
+          return (s === 'tag' || t === 'tag') ? 60 : 90
+        }))
+      .force('charge', d3.forceManyBody().strength((d) => {
+        const n = d as GNode
+        return n.type === 'tag' ? -80 : -50
+      }))
+      .force('center', d3.forceCenter(W / 2, H / 2))
+      .force('collision', d3.forceCollide().radius((d) => nodeRadius(d as GNode) + 4))
+
+    // Glow filter for current node
+    const defs = svg.append('defs')
+    const filter = defs.append('filter').attr('id', 'glow')
+    filter.append('feGaussianBlur').attr('stdDeviation', '3').attr('result', 'blur')
+    const feMerge = filter.append('feMerge')
+    feMerge.append('feMergeNode').attr('in', 'blur')
+    feMerge.append('feMergeNode').attr('in', 'SourceGraphic')
+
+    // Zoom container
+    const g = svg.append('g')
+
+    const zoom = d3.zoom<SVGSVGElement, unknown>()
+      .scaleExtent([0.2, 4])
+      .on('zoom', e => g.attr('transform', e.transform))
+    svg.call(zoom)
+    svg.on('dblclick.zoom', () => {
+      svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity.translate(W / 2, H / 2))
+    })
+
+    // Edges — quadratic Bézier curves
+    const edgeGroup = g.append('g').attr('class', 'rg-edges')
+    const edge = edgeGroup.selectAll<SVGPathElement, GLink>('path')
+      .data(links)
+      .join('path')
+      .attr('class', 'rg-edge')
+      .attr('fill', 'none')
+
+    // Nodes
+    const nodeGroup = g.append('g').attr('class', 'rg-nodes')
+    const node = nodeGroup.selectAll<SVGGElement, GNode>('g')
+      .data(nodes)
+      .join('g')
+      .attr('class', 'rg-node')
+      .style('cursor', 'pointer')
+
+    // Draw shapes
+    node.each(function(d) {
+      const el = d3.select(this)
+      const r = nodeRadius(d)
+      const isCurrent = d.id === currentSlug
+
+      if (d.type === 'tag') {
+        // Diamond (rotated square)
+        const s = r * 1.4
+        el.append('rect')
+          .attr('width', s * 2)
+          .attr('height', s * 2)
+          .attr('x', -s)
+          .attr('y', -s)
+          .attr('transform', 'rotate(45)')
+          .attr('fill', 'var(--mag)')
+          .attr('opacity', 0.85)
+      } else {
+        const catColor = categories[d.tags[0] ?? '']?.color ?? 'var(--accent)'
+        el.append('circle')
+          .attr('r', r)
+          .attr('fill', isCurrent ? 'var(--accent)' : catColor)
+          .attr('opacity', isCurrent ? 1 : 0.85)
+          .attr('filter', isCurrent ? 'url(#glow)' : null)
+          .attr('stroke', isCurrent ? 'var(--ink)' : 'none')
+          .attr('stroke-width', isCurrent ? 1.5 : 0)
       }
     })
 
-    const postList = Object.values(byId)
+    // Labels
+    const label = node.append('text')
+      .attr('class', 'rg-node-label')
+      .attr('dy', d => nodeRadius(d) + 12)
+      .attr('text-anchor', 'middle')
+      .text(d => d.title.slice(0, 18) + (d.title.length > 18 ? '…' : ''))
+      .style('display', showLabels ? 'block' : 'none')
 
-    // Build deduplicated edge list
-    const edgeKeySet = new Set<string>()
-    const edges: { a: string; b: string }[] = []
-    postList.forEach(p =>
-      p.links.forEach(l => {
-        const key = [p.id, l].sort().join('→')
-        if (!edgeKeySet.has(key) && byId[l]) {
-          edgeKeySet.add(key)
-          edges.push({ a: p.id, b: l })
+    // Hover: highlight connected, dim others
+    const linkedSet = (d: GNode) => {
+      const ids = new Set([d.id])
+      links.forEach(l => {
+        const s = (l.source as GNode).id, t = (l.target as GNode).id
+        if (s === d.id) ids.add(t)
+        if (t === d.id) ids.add(s)
+      })
+      return ids
+    }
+
+    node
+      .on('mouseover', function(_, d) {
+        const connected = linkedSet(d)
+        node.transition().duration(150)
+          .style('opacity', (n: GNode) => connected.has(n.id) ? 1 : 0.15)
+        edge.transition().duration(150)
+          .style('opacity', (l: GLink) => {
+            const s = (l.source as GNode).id, t = (l.target as GNode).id
+            return connected.has(s) && connected.has(t) ? 1 : 0.05
+          })
+          .attr('stroke', (l: GLink) => {
+            const s = (l.source as GNode).id, t = (l.target as GNode).id
+            return (connected.has(s) && connected.has(t)) ? 'var(--accent)' : 'var(--line)'
+          })
+        label.transition().duration(150)
+          .style('opacity', (n: GNode) => connected.has(n.id) ? 1 : 0.1)
+      })
+      .on('mouseout', function() {
+        node.transition().duration(200).style('opacity', 1)
+        edge.transition().duration(200).style('opacity', 0.4)
+          .attr('stroke', 'var(--line)')
+        label.transition().duration(200).style('opacity', 1)
+      })
+      .on('click', function(e, d) {
+        e.stopPropagation()
+        if (d.type === 'tag') {
+          router.push(`/tags?t=${d.id.replace('tag:', '')}`)
+        } else if (d.slug) {
+          setSelectedNode(d)
         }
       })
+
+    // Drag
+    node.call(
+      d3.drag<SVGGElement, GNode>()
+        .on('start', (e, d) => {
+          if (!e.active) simulation.alphaTarget(0.3).restart()
+          d.fx = d.x; d.fy = d.y
+        })
+        .on('drag', (e, d) => { d.fx = e.x; d.fy = e.y })
+        .on('end', (e, d) => {
+          if (!e.active) simulation.alphaTarget(0)
+          d.fx = null; d.fy = null
+        })
     )
 
-    // Static pre-relaxation (220 iters)
-    for (let k = 0; k < 220; k++) {
-      postList.forEach(p => { p.fx = 0; p.fy = 0 })
-      for (let i = 0; i < postList.length; i++) {
-        for (let j = i + 1; j < postList.length; j++) {
-          const a = postList[i], b = postList[j]
-          const dx = a.x - b.x, dy = a.y - b.y
-          const d2 = dx * dx + dy * dy + 30
-          const d = Math.sqrt(d2)
-          const f = 3800 / d2
-          a.fx! += (dx / d) * f; a.fy! += (dy / d) * f
-          b.fx! -= (dx / d) * f; b.fy! -= (dy / d) * f
-        }
-      }
-      edges.forEach(e => {
-        const a = byId[e.a], b = byId[e.b]
-        if (!a || !b) return
-        const dx = b.x - a.x, dy = b.y - a.y
-        const d = Math.sqrt(dx * dx + dy * dy) + 1
-        const f = (d - 120) * 0.02
-        a.fx! += (dx / d) * f; a.fy! += (dy / d) * f
-        b.fx! -= (dx / d) * f; b.fy! -= (dy / d) * f
+    // Simulation tick
+    simulation.on('tick', () => {
+      edge.attr('d', (l: GLink) => {
+        const s = l.source as GNode, t = l.target as GNode
+        const mx = ((s.x ?? 0) + (t.x ?? 0)) / 2
+        const my = ((s.y ?? 0) + (t.y ?? 0)) / 2
+        const dx = (t.x ?? 0) - (s.x ?? 0)
+        const dy = (t.y ?? 0) - (s.y ?? 0)
+        const cx = mx - dy * 0.12
+        const cy = my + dx * 0.12
+        return `M${s.x},${s.y} Q${cx},${cy} ${t.x},${t.y}`
       })
-      postList.forEach(p => {
-        p.fx! += (W / 2 - p.x) * 0.005
-        p.fy! += (H / 2 - p.y) * 0.005
-        p.x += Math.max(-8, Math.min(8, p.fx!))
-        p.y += Math.max(-8, Math.min(8, p.fy!))
-      })
-    }
 
-    // Build persistent SVG elements
-    svg.innerHTML = ''
-    const gRoot = document.createElementNS(NS, 'g')
-    const edgeLayer = document.createElementNS(NS, 'g')
-    const nodeLayer = document.createElementNS(NS, 'g')
-    gRoot.appendChild(edgeLayer)
-    gRoot.appendChild(nodeLayer)
-    svg.appendChild(gRoot)
-
-    const edgeEls = new Map<number, { el: SVGLineElement; a: string; b: string }>()
-    const nodeEls = new Map<string, { g: SVGGElement; c: SVGCircleElement; t: SVGTextElement; radius: number }>()
-
-    edges.forEach((e, i) => {
-      const line = document.createElementNS(NS, 'line') as SVGLineElement
-      line.setAttribute('class', 'rg-edge')
-      edgeLayer.appendChild(line)
-      edgeEls.set(i, { el: line, a: e.a, b: e.b })
+      node.attr('transform', (d: GNode) => `translate(${d.x ?? 0},${d.y ?? 0})`)
     })
 
-    postList.forEach(p => {
-      const g = document.createElementNS(NS, 'g') as SVGGElement
-      g.setAttribute('class', 'rg-node')
-      const radius = 5 + Math.min(11, p.links.length * 1.8)
-      const c = document.createElementNS(NS, 'circle') as SVGCircleElement
-      c.setAttribute('r', String(radius))
-      const color = categories[p.cat]?.color ?? 'oklch(0.55 0.05 265)'
-      c.setAttribute('fill', color)
-      c.setAttribute('stroke', 'rgba(17,17,20,0.2)')
-      c.setAttribute('stroke-width', '0.8')
-      g.appendChild(c)
-      const t = document.createElementNS(NS, 'text') as SVGTextElement
-      t.setAttribute('class', 'rg-node-label')
-      t.setAttribute('x', String(radius + 6))
-      t.setAttribute('y', '3')
-      t.textContent = p.title
-      g.appendChild(t)
-      nodeLayer.appendChild(g)
-      nodeEls.set(p.id, { g, c, t, radius })
-    })
-
-    // View state (pan/zoom)
-    const view = { x: 0, y: 0, k: 1 }
-
-    function clientToSvg(cx: number, cy: number) {
-      const s = svgRef.current!
-      const rect = s.getBoundingClientRect()
-      const vb = s.viewBox.baseVal
-      const x = (cx - rect.left) * (vb.width / rect.width)
-      const y = (cy - rect.top) * (vb.height / rect.height)
-      return { x: (x - view.x) / view.k, y: (y - view.y) / view.k }
-    }
-
-    function updateVisual() {
-      gRoot.setAttribute('transform', `translate(${view.x} ${view.y}) scale(${view.k})`)
-      const sel = selectedIdRef.current
-      const tags = activeTagsRef.current
-      const labels = showLabelsRef.current
-      const activeSet =
-        tags.size === 0
-          ? null
-          : new Set(postList.filter(p => p.tags.some(t => tags.has(t))).map(p => p.id))
-      const visible = (id: string) => activeSet === null || activeSet.has(id)
-
-      edgeEls.forEach(({ el, a, b }) => {
-        const na = byId[a], nb = byId[b]
-        if (!na || !nb) return
-        el.setAttribute('x1', String(na.x)); el.setAttribute('y1', String(na.y))
-        el.setAttribute('x2', String(nb.x)); el.setAttribute('y2', String(nb.y))
-        const hot = sel && (sel === a || sel === b)
-        el.setAttribute('class', 'rg-edge' + (hot ? ' hot' : ''))
-        const vis = visible(a) && visible(b) ? (sel && !hot ? '0.35' : '1') : '0.08'
-        el.setAttribute('opacity', vis)
-      })
-
-      nodeEls.forEach((n, id) => {
-        const p = byId[id]
-        if (!p) return
-        n.g.setAttribute('transform', `translate(${p.x} ${p.y})`)
-        const isSel = sel === id
-        const isConnected = sel ? (byId[sel]?.links.includes(id) || id === sel) : false
-        n.c.setAttribute('stroke', isSel ? '#111114' : 'rgba(17,17,20,0.2)')
-        n.c.setAttribute('stroke-width', isSel ? '2' : '0.8')
-        const vis = visible(id) ? (sel && !isConnected ? '0.4' : '1') : '0.12'
-        n.g.setAttribute('opacity', vis)
-        n.t.style.display = labels ? '' : 'none'
-      })
-    }
-
-    updateVisualRef.current = updateVisual
-
-    // Node drag
-    let draggingNode: SimPost | null = null
-    let dragOffset = { ox: 0, oy: 0 }
-    let mouseDownTime = 0
-
-    postList.forEach(p => {
-      const { g, c } = nodeEls.get(p.id)!
-      c.addEventListener('mousedown', ev => {
-        ev.stopPropagation()
-        mouseDownTime = Date.now()
-        draggingNode = byId[p.id]
-        const pt = clientToSvg(ev.clientX, ev.clientY)
-        dragOffset = { ox: pt.x - byId[p.id].x, oy: pt.y - byId[p.id].y }
-        alphaRef.current = Math.min(1, alphaRef.current + 0.6)
-      })
-      g.addEventListener('click', ev => {
-        ev.stopPropagation()
-        if (Date.now() - mouseDownTime > 220) return
-        selectPost(p.id)
-      })
-    })
-
-    // Canvas pan
-    let panDragging = false
-    let panStart = { x: 0, y: 0 }
-    let panOrigin = { x: 0, y: 0 }
-
-    svg.addEventListener('mousedown', e => {
-      if ((e.target as Element).tagName !== 'circle') {
-        panDragging = true
-        panStart = { x: e.clientX, y: e.clientY }
-        panOrigin = { x: view.x, y: view.y }
-        svg.classList.add('rg-dragging')
-      }
-    })
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (draggingNode) {
-        const pt = clientToSvg(e.clientX, e.clientY)
-        draggingNode.x = pt.x - dragOffset.ox
-        draggingNode.y = pt.y - dragOffset.oy
-        alphaRef.current = Math.min(1, alphaRef.current + 0.05)
-        return
-      }
-      if (!panDragging) return
-      view.x = panOrigin.x + (e.clientX - panStart.x)
-      view.y = panOrigin.y + (e.clientY - panStart.y)
-      updateVisual()
-    }
-
-    const handleMouseUp = () => {
-      if (draggingNode) alphaRef.current = Math.min(1, alphaRef.current + 0.4)
-      draggingNode = null
-      panDragging = false
-      svg.classList.remove('rg-dragging')
-    }
-
-    svg.addEventListener('mousemove', handleMouseMove)
-    window.addEventListener('mouseup', handleMouseUp)
-
-    svg.addEventListener('click', e => {
-      if (e.target === svg) clearSelection()
-    })
-
-    svg.addEventListener('wheel', e => {
-      e.preventDefault()
-      view.k = Math.max(0.4, Math.min(2.5, view.k - e.deltaY * 0.001))
-      updateVisual()
-    }, { passive: false })
-
-    // Zoom buttons (accessed via DOM ids)
-    const btnZoomIn = document.getElementById('rg-zoom-in')
-    const btnZoomOut = document.getElementById('rg-zoom-out')
-    const btnZoomReset = document.getElementById('rg-zoom-reset')
-    if (btnZoomIn) btnZoomIn.onclick = () => { view.k = Math.min(2.5, view.k + 0.2); updateVisual() }
-    if (btnZoomOut) btnZoomOut.onclick = () => { view.k = Math.max(0.4, view.k - 0.2); updateVisual() }
-    if (btnZoomReset) btnZoomReset.onclick = () => {
-      view.k = 1; view.x = 0; view.y = 0
-      alphaRef.current = Math.min(1, alphaRef.current + 0.8)
-      updateVisual()
-    }
-
-    // Animation tick
-    function tick() {
-      const alpha = alphaRef.current
-      if (alpha > 0.001) {
-        for (let i = 0; i < postList.length; i++) {
-          for (let j = i + 1; j < postList.length; j++) {
-            const a = postList[i], b = postList[j]
-            const dx = a.x - b.x, dy = a.y - b.y
-            const d2 = dx * dx + dy * dy + 40
-            const d = Math.sqrt(d2)
-            const f = 2600 / d2
-            a.vx += (dx / d) * f * alpha; a.vy += (dy / d) * f * alpha
-            b.vx -= (dx / d) * f * alpha; b.vy -= (dy / d) * f * alpha
-          }
-        }
-        edges.forEach(e => {
-          const a = byId[e.a], b = byId[e.b]
-          if (!a || !b) return
-          const dx = b.x - a.x, dy = b.y - a.y
-          const d = Math.sqrt(dx * dx + dy * dy) + 1
-          const f = (d - 130) * 0.08 * alpha
-          a.vx += (dx / d) * f; a.vy += (dy / d) * f
-          b.vx -= (dx / d) * f; b.vy -= (dy / d) * f
-        })
-        postList.forEach(p => {
-          p.vx += (W / 2 - p.x) * 0.006 * alpha
-          p.vy += (H / 2 - p.y) * 0.006 * alpha
-        })
-        postList.forEach(p => {
-          if (p === draggingNode) { p.vx = 0; p.vy = 0; return }
-          p.vx *= 0.78; p.vy *= 0.78
-          p.x += p.vx; p.y += p.vy
-        })
-        alphaRef.current *= 0.985
-        updateVisual()
-      }
-      rafRef.current = requestAnimationFrame(tick)
-    }
-
-    updateVisual()
-    rafRef.current = requestAnimationFrame(tick)
-
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current)
-      window.removeEventListener('mouseup', handleMouseUp)
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const { post: selectedPost, connected } = detail
+    return () => { simulation.stop() }
+  }, [filteredPosts, currentSlug, localMode, showLabels]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="rg-wrap">
-      {/* Shell */}
       <div className="rg-shell">
         {/* Left sidebar */}
         <aside className="rg-side">
           <div className="rg-eyebrow">범례</div>
           <div className="rg-legend">
-            {catEntries.map(([k, v]) => (
+            {Object.entries(categories).map(([k, v]) => (
               <div key={k} className="rg-legend-row">
                 <span className="rg-legend-dot" style={{ background: v.color }} />
                 <span>{v.label}</span>
-                <span className="rg-legend-count">{posts.filter(p => p.cat === k).length}</span>
+                <span className="rg-legend-count">{filteredPosts.filter(p => p.cat === k).length}</span>
               </div>
             ))}
+            <div className="rg-legend-row">
+              <span className="rg-legend-dot" style={{ background: 'var(--mag)', transform: 'rotate(45deg)', borderRadius: 1 }} />
+              <span>태그</span>
+              <span className="rg-legend-count">{[...new Set(filteredPosts.flatMap(p => p.tags))].length}</span>
+            </div>
           </div>
 
-          <div className="rg-eyebrow" style={{ marginTop: '28px' }}>필터</div>
+          <div className="rg-eyebrow" style={{ marginTop: 24 }}>표시 설정</div>
           <div className="rg-filters">
             <div className="rg-kv">
-              <span>Node size</span>
-              <span className="rg-kv-val">by links</span>
-            </div>
-            <div className="rg-kv">
               <span>Labels</span>
-              <label className="rg-kv-val" style={{ fontFamily: 'var(--mono)', fontSize: '11px' }}>
-                <input
-                  type="checkbox"
-                  checked={showLabels}
-                  onChange={e => toggleLabels(e.target.checked)}
-                />{' '}표시
+              <label className="rg-kv-val">
+                <input type="checkbox" checked={showLabels} onChange={e => setShowLabels(e.target.checked)} />{' '}표시
               </label>
             </div>
           </div>
 
           {allTags.length > 0 && (
             <>
-              <div className="rg-eyebrow" style={{ marginTop: '28px' }}>태그 필터</div>
+              <div className="rg-eyebrow" style={{ marginTop: 24 }}>태그 필터</div>
               <div className="rg-tag-list">
                 {allTags.map(t => (
                   <span
                     key={t}
                     className={'rg-tag-pill' + (activeTags.has(t) ? ' on' : '')}
-                    onClick={() => toggleTag(t)}
-                  >
-                    {t}
-                  </span>
+                    onClick={() => setActiveTags(prev => {
+                      const next = new Set(prev)
+                      next.has(t) ? next.delete(t) : next.add(t)
+                      return next
+                    })}
+                  >{t}</span>
                 ))}
               </div>
             </>
@@ -437,76 +390,43 @@ export default function GraphClient({
 
         {/* Canvas */}
         <div className="rg-canvas">
-          {posts.length === 0 ? (
-            <div className="rg-empty">
-              <span>글이 없습니다</span>
-              <span style={{ fontSize: '10px', color: 'var(--rule)' }}>posts/ 폴더에 .md 파일을 추가하세요</span>
-            </div>
-          ) : (
-            <>
-              <svg
-                ref={svgRef}
-                viewBox="0 0 1000 700"
-                preserveAspectRatio="xMidYMid meet"
-              />
-              <div className="rg-hint">
-                노드 드래그 — 자유롭게 배치 · 빈 공간 드래그 — 전체 이동 · 휠 — 줌
-              </div>
-              <div className="rg-zoom-ctrl">
-                <button id="rg-zoom-out">−</button>
-                <button id="rg-zoom-reset">◌</button>
-                <button id="rg-zoom-in">+</button>
-              </div>
-            </>
-          )}
+          <svg ref={svgRef} />
+          <div className="rg-hint">드래그 — 노드 이동 · 배경 드래그 — 팬 · 휠 — 줌 · 더블클릭 — 리셋</div>
+          <div className="rg-zoom-ctrl">
+            <button onClick={() => {
+              const svg = d3.select(svgRef.current!)
+              svg.transition().duration(300).call(
+                (d3.zoom() as d3.ZoomBehavior<SVGSVGElement, unknown>).scaleBy, 0.7
+              )
+            }}>−</button>
+            <button onClick={() => {
+              const svg = d3.select(svgRef.current!)
+              svg.transition().duration(500).call(
+                (d3.zoom() as d3.ZoomBehavior<SVGSVGElement, unknown>).transform,
+                d3.zoomIdentity
+              )
+            }}>◌</button>
+            <button onClick={() => {
+              const svg = d3.select(svgRef.current!)
+              svg.transition().duration(300).call(
+                (d3.zoom() as d3.ZoomBehavior<SVGSVGElement, unknown>).scaleBy, 1.4
+              )
+            }}>+</button>
+          </div>
         </div>
 
         {/* Right sidebar */}
         <aside className="rg-side rg-side-right">
           <div className="rg-eyebrow">선택</div>
           <div className="rg-detail">
-            {selectedPost ? (
+            {selectedNode ? (
               <>
-                <h3>{selectedPost.title}</h3>
+                <h3>{selectedNode.title}</h3>
                 <div className="rg-detail-meta">
-                  {categories[selectedPost.cat]?.label ?? selectedPost.cat}
-                  {' · '}{selectedPost.links.length} links
-                  {' · '}{selectedPost.tags.length} tags
+                  {selectedNode.tags.join(' · ')}
                 </div>
-                {selectedPost.summary && <p>{selectedPost.summary}</p>}
-
                 <div className="rg-linkset">
-                  {connected.length > 0 && (
-                    <>
-                      <div className="rg-eyebrow" style={{ marginTop: '10px' }}>Connected</div>
-                      {connected.map(l => {
-                        const t = posts.find(p => p.id === l)
-                        return t ? (
-                          <button
-                            key={l}
-                            className="rg-link-btn"
-                            onClick={() => selectPost(l)}
-                          >
-                            {'[['}{t.title}{']]'}
-                          </button>
-                        ) : null
-                      })}
-                    </>
-                  )}
-
-                  {selectedPost.tags.length > 0 && (
-                    <>
-                      <div className="rg-eyebrow" style={{ marginTop: '16px' }}>Tags</div>
-                      <div className="rg-tag-list">
-                        {selectedPost.tags.map(t => (
-                          <span key={t} className="rg-tag-pill">{t}</span>
-                        ))}
-                      </div>
-                    </>
-                  )}
-
-                  <div className="rg-eyebrow" style={{ marginTop: '16px' }}>Open</div>
-                  <Link href={`/post/${selectedPost.slug}`} className="rg-open-link">
+                  <Link href={`/post/${selectedNode.slug}`} className="rg-open-link">
                     글 페이지로 이동 ↗
                   </Link>
                 </div>
@@ -514,13 +434,12 @@ export default function GraphClient({
             ) : (
               <>
                 <h3>노드를 선택하세요</h3>
-                <div className="rg-detail-meta">
-                  그래프에서 글을 클릭하면 여기에 요약이 표시됩니다.
-                </div>
-                <p>
-                  realzoojin의 글과 태그는 Obsidian의{' '}
-                  <code>{'[[wikilinks]]'}</code>로 연결되어 있습니다.
-                  연결된 노드는 선으로 이어지고, 같은 태그를 공유하는 글은 색으로 묶입니다.
+                <p style={{ fontSize: 12 }}>
+                  노트 노드(●)를 클릭하면 요약이 표시됩니다.<br />
+                  태그 노드(◆)를 클릭하면 태그 페이지로 이동합니다.
+                </p>
+                <p style={{ fontSize: 12, marginTop: 8 }}>
+                  전체 {posts.length}개 노트 · {[...new Set(posts.flatMap(p => p.tags))].length}개 태그
                 </p>
               </>
             )}

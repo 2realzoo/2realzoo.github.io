@@ -1,213 +1,208 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import * as d3 from 'd3'
 
-interface Node {
-  id: string
+interface RawPost {
+  slug: string
   title: string
   tags: string[]
-  links: string[]
-  x: number
-  y: number
-  vx: number
-  vy: number
+  summary: string
+}
+
+interface GNode {
+  id: string
+  title: string
+  type: 'note' | 'tag'
+  slug?: string
+  x?: number; y?: number; vx?: number; vy?: number; fx?: number | null; fy?: number | null
+}
+
+interface GLink {
+  source: string | GNode
+  target: string | GNode
 }
 
 interface Props {
   currentSlug?: string
-  /** Pass posts directly (server-rendered pages can provide this) */
-  posts?: { slug: string; title: string; tags: string[]; summary: string }[]
+  posts?: RawPost[]
   height?: number
 }
 
-const COLORS = ['#2a1aff', '#0a8a3a', '#d8731d', '#8b1da0', '#1d6dcc']
+function buildGraph(posts: RawPost[]) {
+  const nodes: GNode[] = posts.map(p => ({ id: p.slug, title: p.title, type: 'note', slug: p.slug }))
+  const tagSet = new Set(posts.flatMap(p => p.tags))
+  tagSet.forEach(t => nodes.push({ id: `tag:${t}`, title: `#${t}`, type: 'tag' }))
+
+  const links: GLink[] = []
+  posts.forEach(p => {
+    p.tags.forEach(t => links.push({ source: p.slug, target: `tag:${t}` }))
+  })
+  return { nodes, links }
+}
+
+function bfsSubgraph(allNodes: GNode[], allLinks: GLink[], startId: string, hops = 2, max = 20) {
+  const nodeById = new Map(allNodes.map(n => [n.id, n]))
+  const adj = new Map<string, Set<string>>()
+  allLinks.forEach(l => {
+    const s = typeof l.source === 'string' ? l.source : (l.source as GNode).id
+    const t = typeof l.target === 'string' ? l.target : (l.target as GNode).id
+    if (!adj.has(s)) adj.set(s, new Set())
+    if (!adj.has(t)) adj.set(t, new Set())
+    adj.get(s)!.add(t)
+    adj.get(t)!.add(s)
+  })
+
+  const visited = new Set<string>()
+  const queue: [string, number][] = [[startId, 0]]
+  while (queue.length && visited.size < max) {
+    const [id, depth] = queue.shift()!
+    if (visited.has(id)) continue
+    visited.add(id)
+    if (depth < hops) adj.get(id)?.forEach(nb => { if (!visited.has(nb)) queue.push([nb, depth + 1]) })
+  }
+
+  return {
+    nodes: [...visited].map(id => nodeById.get(id)!).filter(Boolean),
+    links: allLinks.filter(l => {
+      const s = typeof l.source === 'string' ? l.source : (l.source as GNode).id
+      const t = typeof l.target === 'string' ? l.target : (l.target as GNode).id
+      return visited.has(s) && visited.has(t)
+    }),
+  }
+}
 
 export default function GraphMini({ currentSlug, posts: propPosts, height = 160 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
-  const rafRef = useRef<number | null>(null)
-  const nodesRef = useRef<Node[]>([])
-  const [ready, setReady] = useState(false)
   const router = useRouter()
-  const W = 240, H = height
 
   useEffect(() => {
-    async function init(rawPosts: { slug: string; title: string; tags: string[] }[]) {
-      // Simple tag-based linking: posts that share tags are linked
-      const nodes: Node[] = rawPosts.map((p, i) => {
-        const angle = (i / rawPosts.length) * Math.PI * 2
-        const r = Math.min(W, H) * 0.3
-        return {
-          id: p.slug,
-          title: p.title,
-          tags: p.tags,
-          links: rawPosts
-            .filter(q => q.slug !== p.slug && q.tags.some(t => p.tags.includes(t)))
-            .map(q => q.slug),
-          x: W / 2 + r * Math.cos(angle),
-          y: H / 2 + r * Math.sin(angle),
-          vx: 0,
-          vy: 0,
+    const draw = (rawPosts: RawPost[]) => {
+      const svg = d3.select(svgRef.current!)
+      svg.selectAll('*').remove()
+      const W = svgRef.current!.clientWidth || 240
+      const H = height
+
+      const { nodes: allNodes, links: allLinks } = buildGraph(rawPosts)
+      const { nodes, links } = currentSlug
+        ? bfsSubgraph(allNodes, allLinks, currentSlug)
+        : { nodes: allNodes, links: allLinks }
+
+      if (nodes.length === 0) return
+
+      const g = svg.append('g')
+      const zoom = d3.zoom<SVGSVGElement, unknown>()
+        .scaleExtent([0.3, 3])
+        .on('zoom', e => g.attr('transform', e.transform))
+      svg.call(zoom)
+
+      const simulation = d3.forceSimulation(nodes as d3.SimulationNodeDatum[])
+        .force('link', d3.forceLink(links as d3.SimulationLinkDatum<d3.SimulationNodeDatum>[])
+          .id((d: d3.SimulationNodeDatum) => (d as GNode).id)
+          .distance(30))
+        .force('charge', d3.forceManyBody().strength(-40))
+        .force('center', d3.forceCenter(W / 2, H / 2))
+        .force('collision', d3.forceCollide().radius(8))
+
+      const edge = g.append('g').selectAll<SVGPathElement, GLink>('path')
+        .data(links)
+        .join('path')
+        .attr('fill', 'none')
+        .attr('stroke', 'var(--line)')
+        .attr('stroke-width', 1)
+        .attr('opacity', 0.35)
+
+      const node = g.append('g').selectAll<SVGGElement, GNode>('g')
+        .data(nodes)
+        .join('g')
+        .style('cursor', 'pointer')
+
+      // Glow for current
+      const defs = svg.append('defs')
+      const filt = defs.append('filter').attr('id', 'mini-glow')
+      filt.append('feGaussianBlur').attr('stdDeviation', 2).attr('result', 'blur')
+      const fm = filt.append('feMerge')
+      fm.append('feMergeNode').attr('in', 'blur')
+      fm.append('feMergeNode').attr('in', 'SourceGraphic')
+
+      node.each(function(d) {
+        const el = d3.select(this)
+        const isCurrent = d.id === currentSlug
+        if (d.type === 'tag') {
+          el.append('rect')
+            .attr('width', 8).attr('height', 8)
+            .attr('x', -4).attr('y', -4)
+            .attr('transform', 'rotate(45)')
+            .attr('fill', 'var(--mag)')
+            .attr('opacity', 0.8)
+        } else {
+          el.append('circle')
+            .attr('r', isCurrent ? 7 : 4)
+            .attr('fill', isCurrent ? 'var(--accent)' : 'var(--ink-mute)')
+            .attr('opacity', isCurrent ? 1 : 0.7)
+            .attr('filter', isCurrent ? 'url(#mini-glow)' : null)
+        }
+        if (isCurrent) {
+          el.append('text')
+            .attr('dy', -10)
+            .attr('text-anchor', 'middle')
+            .attr('fill', 'var(--ink)')
+            .attr('font-size', 9)
+            .attr('font-family', 'var(--mono)')
+            .text(d.title.slice(0, 14) + (d.title.length > 14 ? '…' : ''))
         }
       })
-      nodesRef.current = nodes
-      setReady(true)
-      simulate()
+
+      node
+        .on('mouseover', function(_, d) {
+          const conn = new Set([d.id])
+          links.forEach(l => {
+            const s = (l.source as GNode).id, t = (l.target as GNode).id
+            if (s === d.id) conn.add(t)
+            if (t === d.id) conn.add(s)
+          })
+          node.style('opacity', (n: GNode) => conn.has(n.id) ? 1 : 0.2)
+          edge.style('opacity', (l: GLink) => {
+            const s = (l.source as GNode).id, t = (l.target as GNode).id
+            return conn.has(s) && conn.has(t) ? 0.9 : 0.05
+          })
+        })
+        .on('mouseout', () => {
+          node.style('opacity', 1)
+          edge.style('opacity', 0.35)
+        })
+        .on('click', (e, d) => {
+          e.stopPropagation()
+          if (d.type === 'tag') router.push(`/tags?t=${d.id.replace('tag:', '')}`)
+          else if (d.slug) router.push(`/post/${d.slug}`)
+        })
+
+      simulation.on('tick', () => {
+        edge.attr('d', (l: GLink) => {
+          const s = l.source as GNode, t = l.target as GNode
+          const mx = ((s.x ?? 0) + (t.x ?? 0)) / 2
+          const my = ((s.y ?? 0) + (t.y ?? 0)) / 2
+          const dx = (t.x ?? 0) - (s.x ?? 0)
+          const dy = (t.y ?? 0) - (s.y ?? 0)
+          return `M${s.x},${s.y} Q${mx - dy * 0.1},${my + dx * 0.1} ${t.x},${t.y}`
+        })
+        node.attr('transform', (d: GNode) => `translate(${d.x ?? 0},${d.y ?? 0})`)
+      })
+
+      return () => simulation.stop()
     }
 
     if (propPosts) {
-      init(propPosts)
+      draw(propPosts)
     } else {
-      fetch('/posts.json')
-        .then(r => r.json())
-        .then(init)
-        .catch(() => setReady(true))
+      fetch('/posts.json').then(r => r.json()).then(draw).catch(() => {})
     }
-
-    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  function simulate() {
-    let alpha = 1
-
-    function tick() {
-      const nodes = nodesRef.current
-      if (!nodes.length) return
-
-      alpha *= 0.96
-      const cx = W / 2, cy = H / 2
-
-      for (const n of nodes) {
-        // Center gravity
-        n.vx += (cx - n.x) * 0.01
-        n.vy += (cy - n.y) * 0.01
-
-        // Repulsion
-        for (const m of nodes) {
-          if (m === n) continue
-          const dx = n.x - m.x, dy = n.y - m.y
-          const d2 = dx * dx + dy * dy + 1
-          const f = 80 / d2
-          n.vx += dx * f
-          n.vy += dy * f
-        }
-
-        // Link attraction
-        for (const lid of n.links) {
-          const m = nodes.find(x => x.id === lid)
-          if (!m) continue
-          const dx = m.x - n.x, dy = m.y - n.y
-          n.vx += dx * 0.04
-          n.vy += dy * 0.04
-        }
-
-        n.vx *= 0.7
-        n.vy *= 0.7
-        n.x = Math.max(12, Math.min(W - 12, n.x + n.vx * alpha))
-        n.y = Math.max(12, Math.min(H - 12, n.y + n.vy * alpha))
-      }
-
-      render()
-      if (alpha > 0.02) rafRef.current = requestAnimationFrame(tick)
-    }
-
-    rafRef.current = requestAnimationFrame(tick)
-  }
-
-  function render() {
-    const svg = svgRef.current
-    if (!svg) return
-    const nodes = nodesRef.current
-
-    // Clear
-    while (svg.firstChild) svg.removeChild(svg.firstChild)
-
-    const ns = 'http://www.w3.org/2000/svg'
-
-    // Edges
-    for (const n of nodes) {
-      for (const lid of n.links) {
-        const m = nodes.find(x => x.id === lid)
-        if (!m || m.id < n.id) continue // draw once
-        const line = document.createElementNS(ns, 'line')
-        line.setAttribute('x1', String(n.x))
-        line.setAttribute('y1', String(n.y))
-        line.setAttribute('x2', String(m.x))
-        line.setAttribute('y2', String(m.y))
-        const isCurrent = n.id === currentSlug || m.id === currentSlug
-        line.setAttribute('stroke', isCurrent ? 'var(--accent)' : 'var(--line)')
-        line.setAttribute('stroke-width', isCurrent ? '1.5' : '1')
-        line.setAttribute('opacity', isCurrent ? '0.7' : '0.3')
-        svg.appendChild(line)
-      }
-    }
-
-    // Nodes
-    nodes.forEach((n, i) => {
-      const isCurrent = n.id === currentSlug
-      const color = COLORS[i % COLORS.length]
-
-      const g = document.createElementNS(ns, 'g')
-      g.setAttribute('style', 'cursor:pointer')
-      g.addEventListener('click', () => router.push(`/post/${n.id}`))
-
-      if (isCurrent) {
-        // Halo
-        const halo = document.createElementNS(ns, 'circle')
-        halo.setAttribute('cx', String(n.x))
-        halo.setAttribute('cy', String(n.y))
-        halo.setAttribute('r', '9')
-        halo.setAttribute('fill', 'none')
-        halo.setAttribute('stroke', 'var(--accent)')
-        halo.setAttribute('stroke-width', '1.5')
-        halo.setAttribute('stroke-dasharray', '3 2')
-        g.appendChild(halo)
-      }
-
-      const circle = document.createElementNS(ns, 'circle')
-      circle.setAttribute('cx', String(n.x))
-      circle.setAttribute('cy', String(n.y))
-      circle.setAttribute('r', isCurrent ? '6' : '4')
-      circle.setAttribute('fill', isCurrent ? 'var(--accent)' : color)
-      circle.setAttribute('opacity', isCurrent ? '1' : '0.8')
-      g.appendChild(circle)
-
-      // Label (only for current node)
-      if (isCurrent) {
-        const text = document.createElementNS(ns, 'text')
-        text.setAttribute('x', String(n.x))
-        text.setAttribute('y', String(n.y - 12))
-        text.setAttribute('text-anchor', 'middle')
-        text.setAttribute('fill', 'var(--ink)')
-        text.setAttribute('font-size', '9')
-        text.setAttribute('font-family', 'var(--mono)')
-        text.textContent = n.title.slice(0, 12) + (n.title.length > 12 ? '…' : '')
-        g.appendChild(text)
-      }
-
-      svg.appendChild(g)
-    })
-  }
+  }, [propPosts, currentSlug, height]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div style={{ position: 'relative', height, border: '1.5px solid var(--line)', background: 'var(--bg)' }}>
-      <svg
-        ref={svgRef}
-        width="100%"
-        height={H}
-        viewBox={`0 0 ${W} ${H}`}
-        preserveAspectRatio="xMidYMid meet"
-        style={{ display: 'block' }}
-      />
-      {!ready && (
-        <div style={{
-          position: 'absolute', inset: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--ink-mute)',
-        }}>
-          loading...
-        </div>
-      )}
+    <div style={{ position: 'relative', height, border: '1.5px solid var(--line)', background: 'var(--card)', overflow: 'hidden' }}>
+      <svg ref={svgRef} width="100%" height={height} style={{ display: 'block' }} />
     </div>
   )
 }
