@@ -147,7 +147,6 @@ body {
 
 /* ── Post detail ── */
 .post-layout { display: grid; grid-template-columns: 220px 1fr 260px; min-height: calc(100vh - 36px); }
-@media (max-width: 1100px) { .post-layout { grid-template-columns: 1fr; } .post-sidebar-left, .post-sidebar-right { display: none; } }
 .post-sidebar-left { border-right: 1.5px solid var(--line); padding: 24px 18px; display: flex; flex-direction: column; gap: 20px; background: var(--bg); position: sticky; top: 36px; height: calc(100vh - 36px); overflow-y: auto; scrollbar-width: thin; }
 .post-sidebar-right { padding: 20px 16px; display: flex; flex-direction: column; gap: 14px; background: var(--bg); position: sticky; top: 36px; height: calc(100vh - 36px); overflow-y: auto; scrollbar-width: thin; }
 .post-back-btn { align-self: flex-start; background: transparent; border: 1.5px solid var(--line); padding: 6px 12px; font-family: var(--mono); font-size: 12px; color: var(--ink); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
@@ -160,31 +159,31 @@ body {
 .post-meta-list { font-family: var(--mono); font-size: 11.5px; color: var(--ink-mute); line-height: 1.8; }
 .post-meta-list .meta-val { color: var(--ink); }
 .post-meta-list .meta-cat { color: var(--mag); }
-.post-main { background: var(--card); border-left: 1.5px solid var(--line); border-right: 1.5px solid var(--line); min-height: calc(100vh - 36px); }
+.post-main { background: var(--card); border-left: 1.5px solid var(--line); border-right: 1.5px solid var(--line); min-height: calc(100vh - 36px); overflow-x: hidden; min-width: 0; }
 .post-article { padding: 44px 56px 48px; max-width: 740px; margin: 0 auto; }
-@media (max-width: 1100px) { .post-article { padding: 24px 20px; } }
-.post-header-meta { display: flex; justify-content: space-between; align-items: center; font-family: var(--mono); font-size: 11px; color: var(--ink-mute); letter-spacing: 1px; margin-bottom: 16px; }
+.post-header-meta { display: flex; justify-content: space-between; align-items: center; font-family: var(--mono); font-size: 11px; color: var(--ink-mute); letter-spacing: 1px; margin-bottom: 16px; flex-wrap: wrap; gap: 6px; }
 .post-header-meta .meta-cat { color: var(--mag); }
-.post-title { font-family: var(--kr); font-size: 34px; font-weight: 700; line-height: 1.25; color: var(--ink); margin: 0; }
-@media (max-width: 600px) { .post-title { font-size: 24px; } }
+.post-title { font-family: var(--kr); font-size: 34px; font-weight: 700; line-height: 1.25; color: var(--ink); margin: 0; word-break: keep-all; }
 .post-en-title { font-family: var(--serif); font-style: italic; font-size: 21px; color: var(--mag); margin-top: 8px; }
 .post-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 18px; }
 .post-divider { border: none; border-top: 1.5px dashed var(--line); margin: 28px 0; }
-.post-body { font-family: var(--kr); font-size: 16px; line-height: 1.85; color: var(--ink); }
+.post-body { font-family: var(--kr); font-size: 16px; line-height: 1.85; color: var(--ink); overflow-x: hidden; }
 .post-body p { margin: 0 0 18px; }
-.post-body h2 { font-family: var(--pixel); font-size: 20px; color: var(--ink); margin: 2.5rem 0 0.75rem; }
-.post-body h3 { font-family: var(--pixel); font-size: 16px; color: var(--ink); margin: 2rem 0 0.6rem; }
+.post-body h2 { font-family: var(--pixel); font-size: 20px; color: var(--ink); margin: 2.5rem 0 0.75rem; scroll-margin-top: 52px; }
+.post-body h3 { font-family: var(--pixel); font-size: 16px; color: var(--ink); margin: 2rem 0 0.6rem; scroll-margin-top: 52px; }
+.post-body h1 { scroll-margin-top: 52px; }
 .post-body a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
 .post-body strong { font-weight: 700; }
 .post-body em { font-style: italic; }
 .post-body ul, .post-body ol { margin: 0.9rem 0 0.9rem 1.4rem; }
 .post-body li { margin: 0.3rem 0; }
 .post-body blockquote { border-left: 2px solid var(--line); padding-left: 1rem; margin: 1.5rem 0; color: var(--ink-mute); font-style: italic; }
-.post-body pre { background: var(--code-bg); border: 1.5px solid var(--line); padding: 14px 16px; overflow-x: auto; margin: 1.5rem 0; font-family: var(--mono); font-size: 13px; line-height: 1.65; color: var(--ink); }
-.post-body code { font-family: var(--mono); font-size: 0.875em; background: var(--code-bg); border: 1px solid var(--line); padding: 2px 5px; color: var(--ink); display: inline; }
-.post-body pre code { background: none; border: none; padding: 0; font-size: inherit; display: block; }
-.post-body table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; font-size: 14px; font-family: var(--mono); }
-.post-body th, .post-body td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; }
+.post-body pre { background: var(--code-bg); border: 1.5px solid var(--line); padding: 14px 16px; overflow-x: auto; margin: 1.5rem 0; font-family: var(--mono); font-size: 13px; line-height: 1.65; color: var(--ink); max-width: 100%; }
+.post-body code { font-family: var(--mono); font-size: 0.875em; background: var(--code-bg); border: 1px solid var(--line); padding: 2px 5px; color: var(--ink); display: inline; word-break: break-all; }
+.post-body pre code { background: none; border: none; padding: 0; font-size: inherit; display: block; word-break: normal; }
+/* Table: scrollable on mobile */
+.post-body table { display: block; width: max-content; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border-collapse: collapse; margin: 1.5rem 0; font-size: 14px; font-family: var(--mono); }
+.post-body th, .post-body td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; white-space: nowrap; }
 .post-body th { background: var(--chrome); color: var(--ink); font-weight: 600; }
 .post-body td { color: var(--ink-soft); }
 .post-body hr { border: none; border-top: 1px solid var(--line); margin: 2rem 0; }
@@ -193,7 +192,7 @@ body {
 .post-nav-item:hover { border-color: var(--accent); }
 .post-nav-item.next { text-align: right; }
 .post-nav-label { font-family: var(--mono); font-size: 11px; color: var(--ink-mute); }
-.post-nav-title { font-family: var(--kr); font-size: 14px; color: var(--ink); margin-top: 4px; }
+.post-nav-title { font-family: var(--kr); font-size: 14px; color: var(--ink); margin-top: 4px; word-break: keep-all; }
 .linked-note { padding: 6px 0; border-bottom: 1px dashed var(--line); text-decoration: none; display: block; color: inherit; }
 .linked-note:last-child { border-bottom: none; }
 .linked-note-id { font-family: var(--mono); font-size: 10px; color: var(--ink-mute); }
@@ -201,6 +200,32 @@ body {
 .action-btn { background: transparent; border: 1.5px solid var(--line); padding: 5px 10px; text-align: left; color: var(--ink); cursor: pointer; font-family: var(--mono); font-size: 11.5px; width: 100%; display: block; text-decoration: none; }
 .action-btn:hover { border-color: var(--accent); color: var(--accent); }
 .action-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+/* Mobile back button — only shown when sidebars are hidden */
+.post-mobile-header { display: none; }
+
+/* ── Responsive: tablet (≤1100px) — hide sidebars ── */
+@media (max-width: 1100px) {
+  .post-layout { grid-template-columns: 1fr; }
+  .post-sidebar-left, .post-sidebar-right { display: none; }
+  .post-main { border-left: none; border-right: none; }
+  .post-article { padding: 24px 20px 40px; }
+  .post-mobile-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; border-bottom: 1.5px solid var(--line); background: var(--bg); }
+}
+
+/* ── Responsive: mobile (≤600px) ── */
+@media (max-width: 600px) {
+  .post-article { padding: 16px 16px 32px; }
+  .post-title { font-size: 22px; }
+  .post-en-title { font-size: 16px; }
+  .post-body { font-size: 15px; }
+  .post-body h2 { font-size: 17px; }
+  .post-body h3 { font-size: 14px; }
+  .post-body pre { font-size: 11.5px; padding: 10px 12px; }
+  .post-body th, .post-body td { font-size: 12px; padding: 5px 8px; }
+  .post-nav { grid-template-columns: 1fr; gap: 8px; }
+  .post-nav-item.next { text-align: left; }
+  .home-hero-ascii { display: none; }
+}
 
 /* ── Graph page ── */
 .graph-page { height: calc(100vh - 36px); position: relative; }

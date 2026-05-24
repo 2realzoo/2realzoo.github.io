@@ -75,6 +75,14 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
           </div>
         </aside>
 
+        {/* Mobile header — visible only when sidebars are hidden (≤1100px) */}
+        <div className="post-mobile-header" style={{ gridColumn: '1 / -1' }}>
+          <Link href="/" className="post-back-btn">← back</Link>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ink-mute)' }}>
+            {post.date}
+          </span>
+        </div>
+
         {/* Center — article */}
         <main className="post-main">
           <article className="post-article">
