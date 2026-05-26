@@ -1,5 +1,6 @@
 ---
 title: "RAG를 위한 PDF 파서 선택 가이드: Docling vs Azure DI vs opendataloader"
+category: "review"
 date: 2026-03-30
 tags: ["rag", "pdf", "parser", "docling", "azure"]
 summary: "RAG 파이프라인에 PDF 파서를 도입할 때 Docling, Azure Document Intelligence, opendataloader 세 가지를 직접 테스트한 결과를 정리했습니다."

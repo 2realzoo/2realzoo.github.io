@@ -1,5 +1,6 @@
 ---
 title: "RAG용 XLSX 파서 비교: docling보다 openpyxl이 나았던 이유"
+category: "review"
 date: 2026-05-17
 tags: ["rag", "xlsx", "문서파싱", "openpyxl", "docling"]
 summary: "업무용 XLSX에서 병합 셀과 카테고리 열이 많은 경우, openpyxl은 rowspan과 Excel 구조를 보존했지만 docling은 테이블을 과분리해 컨텍스트를 잃는 문제가 있었습니다."

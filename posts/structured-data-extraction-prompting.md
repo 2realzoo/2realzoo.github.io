@@ -1,5 +1,6 @@
 ---
 title: "프롬프트를 잘 쓰는 법: LLM에게 정형 데이터를 뽑게 할 때 배운 것"
+category: "retrospect"
 date: 2026-05-19
 tags: ["llm", "prompt-engineering", "structured-output", "automation"]
 summary: "LLM으로 정형 데이터를 추출할 때 프롬프트를 길게 쓰는 것보다, 모델이 판단해야 할 일을 줄이는 구조가 더 중요하다는 경험을 정리했습니다."
