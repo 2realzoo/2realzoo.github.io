@@ -19,10 +19,11 @@ export default function AboutPage() {
 
           <h2 className="about-name-serif">2realzoo</h2>
           <p className="about-bio">
-            안녕하세요. ML/Backend 사이를 오가는 엔지니어입니다.
-            서울에서 일하고, 매주 한 편씩 회고와 노트를 씁니다.
+            안녕하세요. 사내에서 쓰이는 AI 어시스턴트 서비스를 만드는 LLM 엔지니어입니다.
+            주로 챗봇 쪽 업무를 맡고 있어요.
             <br /><br />
-            지금은 사내 RAG 파이프라인의 평가셋과 비용 최적화, 사이드로 만드는 작은 SaaS의 결제, 그리고 Mamba 재현을 천천히 진행하고 있어요.
+            지금은 제약회사의 MR(영업 담당자) 어시스턴트 애플리케이션을 개발하고 있습니다.
+            여기엔 그 과정에서 부딪힌 문제와 정리한 노트를 올립니다.
           </p>
 
           <div className="about-section-title">SKILLS</div>
@@ -35,19 +36,9 @@ export default function AboutPage() {
           <div className="about-section-title">WORK</div>
           <div className="work-list">
             <div className="work-item">
-              <div className="work-date">2025–</div>
-              <div className="work-company">ML/AI Startup</div>
-              <div className="work-role">Senior ML Engineer · RAG infra & evals</div>
-            </div>
-            <div className="work-item">
-              <div className="work-date">2022–2025</div>
-              <div className="work-company">Backend Engineer</div>
-              <div className="work-role">Recommendations team</div>
-            </div>
-            <div className="work-item">
-              <div className="work-date">2020–2022</div>
-              <div className="work-company">CS Graduate</div>
-              <div className="work-role">MS in Machine Learning</div>
+              <div className="work-date">2025.08–</div>
+              <div className="work-company">제약회사 (anonymized)</div>
+              <div className="work-role">LLM Engineer · MR 어시스턴트 애플리케이션 개발</div>
             </div>
           </div>
         </div>
@@ -99,9 +90,9 @@ export default function AboutPage() {
           {/* Currently */}
           <div className="currently-box">
             <div className="currently-title">currently</div>
-            ▸ writing: RAG eval 시리즈<br />
-            ▸ reading: Designing ML Systems<br />
-            ▸ building: side SaaS (billing phase)
+            ▸ building: 제약회사 MR 어시스턴트<br />
+            ▸ exploring: 사내 챗봇 UX & RAG<br />
+            ▸ writing: LLM·챗봇 개발 노트
           </div>
         </div>
       </div>

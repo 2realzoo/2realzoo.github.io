@@ -27,9 +27,18 @@ function highlight(text: string, q: string) {
   )
 }
 
+interface FlagState {
+  r: boolean  // recursive — also search summary/body, not just title+tags
+  n: boolean  // show line numbers
+  i: boolean  // ignore case
+  w: boolean  // whole word match
+  C: boolean  // show context line (summary)
+}
+
 export default function SearchPage() {
   const [posts, setPosts] = useState<PostMeta[]>([])
   const [query, setQuery] = useState('')
+  const [flags, setFlags] = useState<FlagState>({ r: true, n: true, i: true, w: false, C: false })
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -37,24 +46,43 @@ export default function SearchPage() {
     inputRef.current?.focus()
   }, [])
 
-  const q = query.trim().toLowerCase()
+  const toggleFlag = (key: keyof FlagState) =>
+    setFlags(prev => ({ ...prev, [key]: !prev[key] }))
+
+  const raw = query.trim()
+  const q = flags.i ? raw.toLowerCase() : raw
+
+  // Build a matcher honoring ignore-case (-i) and whole-word (-w) flags.
+  const matches = (text: string) => {
+    if (!q) return false
+    if (flags.w) {
+      const esc = raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      return new RegExp(`\\b${esc}\\b`, flags.i ? 'i' : '').test(text)
+    }
+    return (flags.i ? text.toLowerCase() : text).includes(q)
+  }
+
   const results = q
     ? posts.filter(p =>
-        p.title.toLowerCase().includes(q) ||
-        p.summary.toLowerCase().includes(q) ||
-        p.tags.some(t => t.toLowerCase().includes(q))
+        matches(p.title) ||
+        (flags.r && matches(p.summary)) ||
+        p.tags.some(t => matches(t))
       )
     : []
 
   function matchLines(post: PostMeta) {
     const lines: { n: number; kind: string; text: string }[] = []
-    if (post.title.toLowerCase().includes(q)) lines.push({ n: 1, kind: 'title', text: post.title })
-    if (post.summary.toLowerCase().includes(q)) lines.push({ n: 14, kind: 'body', text: post.summary })
-    if (post.tags.some(t => t.toLowerCase().includes(q))) lines.push({ n: 3, kind: 'tag', text: post.tags.join(', ') })
+    if (matches(post.title)) lines.push({ n: 1, kind: 'title', text: post.title })
+    if (flags.r && matches(post.summary)) lines.push({ n: 14, kind: 'body', text: post.summary })
+    if (post.tags.some(t => matches(t))) lines.push({ n: 3, kind: 'tag', text: post.tags.join(', ') })
+    // -C 2: show summary as context even when it isn't itself a match
+    if (flags.C && !lines.some(l => l.kind === 'body') && post.summary) {
+      lines.push({ n: 14, kind: 'context', text: post.summary })
+    }
     return lines
   }
 
-  const totalMatches = results.reduce((s, p) => s + matchLines(p).length, 0)
+  const totalMatches = results.reduce((s, p) => s + matchLines(p).filter(l => l.kind !== 'context').length, 0)
 
   const history = ['grep "llm"', 'grep "rag"', 'grep "eval"', 'ls posts/', 'tag --count']
 
@@ -68,7 +96,15 @@ export default function SearchPage() {
             <span className="sp-path">~/2realzoo</span>
             <span className="sp-dollar">$</span>
             <span className="sp-cmd">grep</span>
-            <span className="sp-flag">-rni</span>
+            {(() => {
+              const letters = (['r', 'n', 'i', 'w'] as const).filter(k => flags[k]).join('')
+              return (
+                <>
+                  {letters && <span className="sp-flag">-{letters}</span>}
+                  {flags.C && <span className="sp-flag">-C 2</span>}
+                </>
+              )
+            })()}
             <span className="sp-quote">&quot;</span>
             <input
               ref={inputRef}
@@ -117,16 +153,16 @@ export default function SearchPage() {
                   </div>
                   {lines.map((ln, i) => (
                     <div key={i} className="search-match-row">
-                      <span className="search-match-num">{String(ln.n).padStart(3, ' ')}</span>
-                      <span className="search-match-sep">│</span>
+                      {flags.n && <span className="search-match-num">{String(ln.n).padStart(3, ' ')}</span>}
+                      {flags.n && <span className="search-match-sep">│</span>}
                       <span style={{
                         fontFamily: ln.kind === 'title' ? 'var(--kr)' : 'var(--mono)',
                         fontSize: ln.kind === 'title' ? 15 : 13,
                         fontWeight: ln.kind === 'title' ? 700 : 400,
-                        color: 'var(--ink)',
+                        color: ln.kind === 'context' ? 'var(--ink-mute)' : 'var(--ink)',
                         lineHeight: 1.5,
                       }}>
-                        {highlight(ln.text, q)}
+                        {ln.kind === 'context' ? ln.text : highlight(ln.text, raw)}
                       </span>
                     </div>
                   ))}
@@ -150,19 +186,31 @@ export default function SearchPage() {
         <aside className="search-sidebar">
           <div>
             <div className="search-sidebar-title">{"// flags"}</div>
-            {[
-              { f: '-r', label: 'recursive', on: true },
-              { f: '-n', label: 'show line nr', on: true },
-              { f: '-i', label: 'ignore case', on: true },
-              { f: '-w', label: 'whole word', on: false },
-              { f: '-C 2', label: '2 lines context', on: false },
-            ].map(o => (
-              <div key={o.f} className="flag-row">
-                <span className={`flag-check${o.on ? ' on' : ''}`}>{o.on ? '✓' : ''}</span>
-                <span style={{ fontWeight: o.on ? 600 : 400, fontFamily: 'var(--mono)', color: o.on ? 'var(--ink)' : 'var(--ink-mute)' }}>{o.f}</span>
-                <span className="flag-label">{o.label}</span>
-              </div>
-            ))}
+            {([
+              { key: 'r', f: '-r', label: 'recursive' },
+              { key: 'n', f: '-n', label: 'show line nr' },
+              { key: 'i', f: '-i', label: 'ignore case' },
+              { key: 'w', f: '-w', label: 'whole word' },
+              { key: 'C', f: '-C 2', label: '2 lines context' },
+            ] as const).map(o => {
+              const on = flags[o.key]
+              return (
+                <div
+                  key={o.f}
+                  className="flag-row"
+                  role="checkbox"
+                  aria-checked={on}
+                  tabIndex={0}
+                  style={{ cursor: 'pointer', userSelect: 'none' }}
+                  onClick={() => toggleFlag(o.key)}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleFlag(o.key) } }}
+                >
+                  <span className={`flag-check${on ? ' on' : ''}`}>{on ? '✓' : ''}</span>
+                  <span style={{ fontWeight: on ? 600 : 400, fontFamily: 'var(--mono)', color: on ? 'var(--ink)' : 'var(--ink-mute)' }}>{o.f}</span>
+                  <span className="flag-label">{o.label}</span>
+                </div>
+              )
+            })}
           </div>
 
           <div>

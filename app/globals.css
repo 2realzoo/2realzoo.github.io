@@ -314,7 +314,9 @@ mark { background: var(--accent); color: #fff; padding: 0 3px; }
 .search-exit { margin-top: 28px; color: var(--ink-mute); font-size: 12px; }
 .search-sidebar { padding: 28px 18px 20px; display: flex; flex-direction: column; gap: 16px; background: var(--bg); overflow-y: auto; }
 .search-sidebar-title { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--ink); margin-bottom: 8px; }
-.flag-row { display: flex; gap: 8px; align-items: center; font-family: var(--mono); font-size: 12px; color: var(--ink); white-space: nowrap; margin-bottom: 4px; }
+.flag-row { display: flex; gap: 8px; align-items: center; font-family: var(--mono); font-size: 12px; color: var(--ink); white-space: nowrap; margin-bottom: 4px; padding: 1px 4px; margin-left: -4px; transition: background 0.1s; }
+.flag-row:hover { background: var(--chrome); }
+.flag-row:hover .flag-check { border-color: var(--accent); }
 .flag-check { width: 14px; height: 14px; border: 1.5px solid var(--line); display: inline-flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; }
 .flag-check.on { background: var(--accent); color: #fff; }
 .flag-label { color: var(--ink-mute); font-size: 11px; overflow: hidden; text-overflow: ellipsis; }

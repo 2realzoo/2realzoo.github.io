@@ -3,7 +3,12 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: '2realzoo',
-  description: 'field notes from an ML/Backend engineer',
+  description: '사내 AI 어시스턴트 / 챗봇을 만들며 부딪힌 문제와 정리한 노트.',
+  alternates: {
+    types: {
+      'application/rss+xml': '/feed.xml',
+    },
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

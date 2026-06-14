@@ -20,7 +20,7 @@ export default function PostsPage() {
 
         <div style={{ display: 'grid', gap: 10, maxWidth: 840 }}>
           {posts.map((post, i) => (
-            <Link key={post.slug} href={`/post/${post.slug}`} className={`post-card${i === 0 ? ' featured' : ''}`}>
+            <Link key={post.slug} href={`/post/${post.slug}`} className="post-card">
               <div className="post-card-meta">
                 <span>[{String(i + 1).padStart(2, '0')}] {post.date}</span>
                 <span className="post-card-meta-cat">{post.category ?? '회고'}</span>
