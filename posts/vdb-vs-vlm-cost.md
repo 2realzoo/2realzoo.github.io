@@ -1,5 +1,6 @@
 ---
 title: "RAG 시스템 비용 최적화: VDB 파이프라인 vs VLM 직접 처리"
+category: "review"
 date: 2026-03-31
 tags: ["rag", "vdb", "vlm", "cost", "architecture"]
 summary: "LLM 기반 리랭커가 포함된 VDB 파이프라인과 VLM 직접 처리 방식의 실제 비용을 계산하고 비교했습니다. 결론은 생각보다 훨씬 큰 차이였습니다."
