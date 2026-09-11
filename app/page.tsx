@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import TabBar from './components/TabBar'
 import GraphMini from './components/GraphMini'
+import MinecraftAvatar from './components/MinecraftAvatar'
 import { getAllPostsMeta, PostMeta } from '@/lib/posts'
 
 const ASCII_LOGO = ` ████████  ██████   ███████   █████   ██       ███████   ███████   ███████
@@ -56,15 +57,15 @@ export default function Home() {
           cat{' '}
           <span style={{ color: 'var(--ink)' }}>~/2realzoo/README.md</span>
         </div>
-        <div className="home-hero-ascii">{ASCII_LOGO}</div>
         <div className="home-hero-sub">
-          <div className="home-hero-tagline">field notes from an AI engineer.</div>
+          <div className="home-hero-ascii">{ASCII_LOGO}</div>
           <div className="home-hero-stats">
             {'// '}{posts.length}{' entries'}<br />
             {'// '}{Array.from(new Set(posts.flatMap(p => p.tags))).length}{' tags'}<br />
             {'// since 2024'}
           </div>
         </div>
+        <div className="home-hero-tagline">field notes from an AI engineer.</div>
       </div>
 
       {/* About */}
@@ -108,6 +109,20 @@ export default function Home() {
           </div>
         </div>
 
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+        {/* Portrait — GitHub avatar, always current */}
+        <div className="about-window">
+          <div className="about-window-chrome">
+            <span>MEET-2REALZOO</span>
+          </div>
+          <div className="about-portrait">
+            {/* github.com/<user>.png is prettier but its 302 carries no CORS
+                header, so the texture load fails. The avatars host does send
+                one, and /u/<id> always serves the current profile photo. */}
+            <MinecraftAvatar src="https://avatars.githubusercontent.com/u/115965399?s=400&v=4" />
+          </div>
+        </div>
+
         {/* Socials */}
         <div className="about-window">
           <div className="about-window-chrome">
@@ -127,6 +142,7 @@ export default function Home() {
               rss / atom feed
             </a>
           </div>
+        </div>
         </div>
       </div>
 
