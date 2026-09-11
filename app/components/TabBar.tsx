@@ -9,7 +9,6 @@ const TABS = [
   { id: 'posts',  label: 'posts.md',   href: '/posts',   swatch: '#0a8a3a' },
   { id: 'graph',  label: 'graph.svg',  href: '/graph',   swatch: '#d8731d' },
   { id: 'tags',   label: 'tags.json',  href: '/tags',    swatch: '#a8208c' },
-  { id: 'about',  label: 'about.md',   href: '/about',   swatch: '#1a1a1a' },
   { id: 'search', label: 'search.txt', href: '/search',  swatch: '#6b6155' },
 ]
 
@@ -18,7 +17,6 @@ function getActiveTab(pathname: string) {
   if (pathname.startsWith('/post')) return 'posts'
   if (pathname.startsWith('/graph')) return 'graph'
   if (pathname.startsWith('/tags')) return 'tags'
-  if (pathname.startsWith('/about')) return 'about'
   if (pathname.startsWith('/search')) return 'search'
   return 'home'
 }

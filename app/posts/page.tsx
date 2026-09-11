@@ -12,13 +12,13 @@ export default function PostsPage() {
   return (
     <>
       <TabBar />
-      <div style={{ padding: '44px 56px' }}>
+      <div className="posts-page">
         <div className="page-heading">
           <span className="page-heading-pixel">posts</span>
           <span className="page-heading-serif">· {posts.length} entries</span>
         </div>
 
-        <div style={{ display: 'grid', gap: 10, maxWidth: 840 }}>
+        <div style={{ display: 'grid', gap: 10 }}>
           {posts.map((post, i) => (
             <Link key={post.slug} href={`/post/${post.slug}`} className="post-card">
               <div className="post-card-meta">

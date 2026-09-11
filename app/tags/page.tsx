@@ -87,7 +87,7 @@ function TagsContent() {
                 <div>
                   <div className="tag-post-meta">[{p.slug.toUpperCase().slice(0,8)}] {p.date} · {p.category ?? '회고'}</div>
                   <div className="tag-post-title">{p.title}</div>
-                  <div className="tag-post-en" style={{ fontStyle: 'italic' }}>{p.summary.slice(0, 60)}</div>
+                  <div className="tag-post-en" style={{ fontStyle: 'italic' }}>{p.summary}</div>
                 </div>
                 <span className="tag-post-reading">{estimateReadingTime(p.summary)}</span>
               </Link>

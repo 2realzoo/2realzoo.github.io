@@ -93,7 +93,7 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
 
             <h1 className="post-title">{post.title}</h1>
             {post.summary && (
-              <div className="post-en-title" style={{ fontStyle: 'italic' }}>{post.summary.slice(0, 80)}</div>
+              <div className="post-en-title" style={{ fontStyle: 'italic' }}>{post.summary}</div>
             )}
 
             <div className="post-tags">
@@ -159,14 +159,6 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
             </div>
           )}
 
-          <div>
-            <div className="sidebar-section-title">{'// actions'}</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <Link href="/" className="action-btn">← back to posts</Link>
-              <Link href="/graph" className="action-btn">⌘G open graph</Link>
-              <Link href={`/tags?t=${post.tags[0] ?? ''}`} className="action-btn primary">↗ related posts</Link>
-            </div>
-          </div>
         </aside>
       </div>
     </>

@@ -58,16 +58,74 @@ export default function Home() {
         </div>
         <div className="home-hero-ascii">{ASCII_LOGO}</div>
         <div className="home-hero-sub">
-          <div>
-            <div className="home-hero-tagline">field notes from an ML/Backend engineer.</div>
-            <div className="home-hero-desc">
-              모델보다 평가셋, 추론보다 파이프라인을 더 좋아합니다. 매주 한 편의 회고와 한 달에 한 편의 논문 정리.
-            </div>
-          </div>
+          <div className="home-hero-tagline">field notes from an AI engineer.</div>
           <div className="home-hero-stats">
             {'// '}{posts.length}{' entries'}<br />
             {'// '}{Array.from(new Set(posts.flatMap(p => p.tags))).length}{' tags'}<br />
             {'// since 2024'}
+          </div>
+        </div>
+      </div>
+
+      {/* About */}
+      <div className="about-page home-about" id="about">
+        <div>
+          <div className="home-posts-header">
+            <div>
+              <span className="home-posts-title">ABOUT</span>
+              <span className="home-posts-title-serif">me</span>
+            </div>
+          </div>
+
+          <p className="about-bio">
+            안녕하세요. 회사 안에서 쓰이는 LLM 어시스턴트를 만드는 엔지니어입니다.
+            챗봇과 그 뒤에 붙는 RAG 파이프라인이 주로 맡는 영역이에요.
+            <br /><br />
+            제약, 자산운용처럼 도메인은 바뀌어도 부딪히는 문제는 비슷했습니다.
+            문서를 어떻게 쪼갤지, 뽑아낸 답이 맞는지 어떻게 확인할지.
+            여기엔 그 과정에서 생긴 노하우를 올립니다.
+          </p>
+
+          <div className="about-section-title">SKILLS</div>
+          <div className="skills-list">
+            {['Python', 'PyTorch', 'TypeScript', 'Next.js', 'Postgres', 'Redis', 'RAG', 'Vector DB', 'LLM Eval', 'Docker'].map(s => (
+              <span key={s} className="skill-tag">{s}</span>
+            ))}
+          </div>
+
+          <div className="about-section-title">WORK</div>
+          <div className="work-list">
+            <div className="work-item">
+              <div className="work-date">2026.07–2026.08</div>
+              <div className="work-company">자산운용사</div>
+              <div className="work-role">LLM Engineer · 수익자 챗봇 서비스 PoC 개발</div>
+            </div>
+            <div className="work-item">
+              <div className="work-date">2025.08–2026.06</div>
+              <div className="work-company">제약회사</div>
+              <div className="work-role">LLM Engineer · MR 어시스턴트 애플리케이션 개발</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Socials */}
+        <div className="about-window">
+          <div className="about-window-chrome">
+            <span>SOCIALS</span>
+          </div>
+          <div className="socials-list">
+            <a href="https://github.com/2realzoo" target="_blank" rel="noreferrer" className="social-item">
+              <span className="social-glyph" style={{ background: '#1a1a1a' }}>GH</span>
+              @2realzoo
+            </a>
+            <a href="mailto:realzoojin@gmail.com" className="social-item">
+              <span className="social-glyph" style={{ background: '#8b1da0' }}>✉</span>
+              realzoojin@gmail.com
+            </a>
+            <a href="/feed.xml" className="social-item">
+              <span className="social-glyph" style={{ background: '#2a1aff' }}>↻</span>
+              rss / atom feed
+            </a>
           </div>
         </div>
       </div>
@@ -91,7 +149,6 @@ export default function Home() {
                 <span className="post-card-meta-cat">{featured.category ?? '회고'}</span>
               </div>
               <h2 className="post-card-title">{featured.title}</h2>
-              <div className="post-card-en" style={{ fontStyle: 'italic' }}>{featured.summary.slice(0, 60)}</div>
               <p className="post-card-excerpt">{featured.summary}</p>
               <div className="post-card-footer">
                 <div className="post-card-tags">
@@ -146,18 +203,6 @@ export default function Home() {
 
         {/* Sidebar */}
         <aside className="home-sidebar">
-          {/* Terminal command box */}
-          <div className="sidebar-cmd">
-            <div><span className="cmd-dollar">$</span> blog --sort date --desc</div>
-            <div className="cmd-ok">→ matched {posts.length} entries.</div>
-            <div>
-              <span className="cmd-dollar">$</span> filter{' '}
-              <span className="cmd-tag">#llm</span>{' '}
-              <span className="cmd-tag2">#rag</span>
-            </div>
-            <div className="cmd-ok">→ matched {posts.filter(p => p.tags.some(t => ['llm','rag'].includes(t))).length} entries.</div>
-          </div>
-
           {/* Mini graph */}
           <div className="sidebar-box">
             <div className="sidebar-box-header">
