@@ -9,13 +9,16 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@types/three": "^0.156.0",
     "d3": "^7.9.0",
     "gray-matter": "^4.0.3",
     "next": "^15.3.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "skinview3d": "^3.4.2",
+    "three": "^0.156.1"
   },
   "devDependencies": {
     "@types/d3": "^7.4.3",
